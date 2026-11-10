@@ -35,6 +35,25 @@ export const GOAL_ICONS = [
   'education', 'gem', 'rocket', 'seedling', 'tools', 'gift', 'phone', 'pet', 'target', 'party',
 ]
 
+export const GOAL_ICON_LABELS: Record<string, string> = {
+  umbrella: 'Guarda-chuva',
+  'money-bag': 'Saco de dinheiro',
+  'house-garden': 'Casa',
+  plane: 'Avião',
+  beach: 'Praia',
+  car: 'Carro',
+  education: 'Formatura',
+  gem: 'Joia',
+  rocket: 'Foguete',
+  seedling: 'Muda de planta',
+  tools: 'Ferramentas',
+  gift: 'Presente',
+  phone: 'Celular',
+  pet: 'Pet',
+  target: 'Alvo',
+  party: 'Festa',
+}
+
 export const CARD_COLORS: Record<string, { label: string; bg: string }> = {
   graphite: { label: 'Grafite', bg: 'linear-gradient(135deg, #3a3d45 0%, #17181c 55%, #2a2c33 100%)' },
   blue: { label: 'Azul', bg: 'linear-gradient(135deg, #2f6bf0 0%, #1740b8 100%)' },

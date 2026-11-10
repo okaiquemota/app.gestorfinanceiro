@@ -1,7 +1,13 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
 
-/* Cores semânticas: trocam sozinhas entre claro e escuro. */
+/*
+ * Design tokens. Cores semânticas trocam sozinhas entre claro e escuro.
+ * Texto: fg > muted > faint (todos >= 4.5:1 sobre surface, bg e sunken).
+ * ghost: só para o "R$" grande dos valores em destaque (>= 3:1, texto grande).
+ * control: borda de campos, bolinhas e chaves (>= 3:1, WCAG 1.4.11).
+ * primary: preenchimento com texto branco; accent: texto/ícone azul sobre superfícies.
+ */
 :root {
   --bg: #f2f3f6;
   --surface: #ffffff;
@@ -9,18 +15,21 @@
   --line: #e8e9ee;
   --line-strong: #d7d9e0;
   --fg: #0d0f14;
-  --muted: #5f6672;
-  --faint: #979ca8;
+  --muted: #4f5663;
+  --faint: #626a78;
+  --ghost: #8a909d;
+  --control: #8b90a0;
   --primary: #1f5ce6;
   --primary-hover: #194fcc;
   --primary-soft: #e9f0fe;
+  --accent: #1f5ce6;
   --on-primary: #ffffff;
-  --good: #0e8a3c;
+  --good: #0b7a34;
   --good-fill: #16a34a;
   --good-soft: #e6f6ec;
-  --warn: #9a6400;
+  --warn: #8a5a00;
   --warn-soft: #fdf3d3;
-  --bad: #d12f2f;
+  --bad: #c62828;
   --bad-soft: #fdebeb;
   /* séries dos gráficos, em ordem fixa — conferidas contra daltonismo e contraste */
   --s-housing: #2a78d6;
@@ -43,11 +52,14 @@
   --line: #24272f;
   --line-strong: #343842;
   --fg: #f1f2f5;
-  --muted: #a3a9b5;
-  --faint: #6d7380;
-  --primary: #4b82f5;
-  --primary-hover: #6393f7;
+  --muted: #a9afbb;
+  --faint: #8b919d;
+  --ghost: #6f7582;
+  --control: #6a7080;
+  --primary: #2f6bf0;
+  --primary-hover: #4279f2;
   --primary-soft: #1a2640;
+  --accent: #7aa2f9;
   --on-primary: #ffffff;
   --good: #3ecf71;
   --good-fill: #22b259;
@@ -69,6 +81,15 @@
   color-scheme: dark;
 }
 
+/*
+ * "fit": telas de computador com altura suficiente. Nelas a Visão geral ocupa
+ * exatamente a janela, sem rolagem da página; se um cartão tiver mais conteúdo
+ * do que cabe, ele rola por dentro.
+ */
+@custom-variant fit (@media (min-width: 80rem) and (min-height: 50rem));
+/* "tight": modo fit em janelas baixas (até ~990px): some o que é detalhe pra caber o essencial */
+@custom-variant tight (@media (min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem));
+
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --color-bg: var(--bg);
@@ -79,6 +100,9 @@
   --color-fg: var(--fg);
   --color-muted: var(--muted);
   --color-faint: var(--faint);
+  --color-ghost: var(--ghost);
+  --color-control: var(--control);
+  --color-accent: var(--accent);
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-soft: var(--primary-soft);
@@ -91,6 +115,15 @@
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
   --shadow-card: var(--shadow);
+  /* escala tipográfica (além de xs 12 / sm 14 / base 16 do Tailwind) */
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1rem;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+  --text-lead: 0.9375rem;
+  --text-lead--line-height: 1.375rem;
+  /* raios: painel 20, controle 12 (rounded-xl), pílula full */
+  --radius-panel: 1.25rem;
   --shadow-pop: var(--shadow-pop);
 }
 
@@ -109,6 +142,16 @@ body {
   line-height: 1.45;
 }
 
+/* resposta ao toque: um leve afundar, sem depender de hover */
+button:not(:disabled):active,
+a[class*='rounded']:active {
+  transform: translateY(0.5px) scale(0.985);
+}
+button,
+a {
+  transition: transform 0.08s ease-out;
+}
+
 button,
 [role='button'],
 select,
@@ -120,7 +163,7 @@ button:disabled {
 }
 
 :focus-visible {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -128,11 +171,17 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-/* <dialog> como modal no desktop e como folha de baixo no celular */
+/*
+ * <dialog> como modal no desktop e como folha de baixo no celular.
+ * A altura máxima fica no <form> interno (.sheet-form), que é o único flex:
+ * cabeçalho e rodapé fixos, miolo que encolhe e rola. Nada aqui depende de
+ * `flex: 1` com base 0%, que no Safari zera a altura do conteúdo quando o
+ * contêiner tem altura automática (o modal abria "vazio" no iPhone).
+ */
 dialog.sheet {
   margin: auto;
   width: min(460px, calc(100vw - 32px));
-  max-height: min(88dvh, 760px);
+  max-height: none;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -142,25 +191,40 @@ dialog.sheet {
   overflow: hidden;
 }
 dialog.sheet[open] {
-  display: flex;
-  flex-direction: column;
+  display: block;
   animation: pop 0.16s ease-out;
 }
 dialog.sheet::backdrop {
   background: rgb(10 12 16 / 0.45);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
+}
+.sheet-form {
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 760px);
+  max-height: min(88dvh, 760px);
+}
+.sheet-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 @media (max-width: 640px) {
   dialog.sheet {
     margin: auto 0 0;
-    width: 100vw;
-    max-width: 100vw;
-    max-height: 92dvh;
+    width: 100%;
+    max-width: 100%;
     border-radius: 22px 22px 0 0;
     border-width: 1px 0 0;
   }
   dialog.sheet[open] {
     animation: rise 0.2s ease-out;
+  }
+  .sheet-form {
+    max-height: 90vh;
+    max-height: 92dvh;
   }
 }
 @keyframes pop {
@@ -188,4 +252,46 @@ dialog.sheet::backdrop {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* seta própria nos selects: mesma aparência em todo navegador */
+select.field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%237b8190' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  padding-right: 2.25rem;
+}
+
+/* <main> recebe foco só por código, ao trocar de tela: não precisa de contorno */
+main:focus {
+  outline: none;
+}
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: -4rem;
+  z-index: 60;
+  border-radius: 0.75rem;
+  background: var(--primary);
+  color: var(--on-primary);
+  padding: 0.625rem 1rem;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* rolagem interna dos cartões no modo "fit": barra fina, sem roubar espaço */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }

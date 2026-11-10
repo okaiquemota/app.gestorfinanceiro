@@ -17,6 +17,10 @@ export const brl = (cents: number): string => {
   return `${neg ? '−' : ''}R$ ${int},${dec}`
 }
 
+/** Arredondado ao real, pra espaços apertados onde o centavo não muda a leitura. */
+export const brlRound = (cents: number): string =>
+  `${cents < 0 ? '−' : ''}R$ ${nf.format(Math.round(Math.abs(cents) / 100))}`
+
 /** Sem centavos, pra espaços apertados (eixos, chips). */
 export const brlShort = (cents: number): string => {
   const abs = Math.abs(cents) / 100
