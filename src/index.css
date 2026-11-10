@@ -81,6 +81,15 @@
   color-scheme: dark;
 }
 
+/*
+ * "fit": telas de computador com altura suficiente. Nelas a Visão geral ocupa
+ * exatamente a janela, sem rolagem da página; se um cartão tiver mais conteúdo
+ * do que cabe, ele rola por dentro.
+ */
+@custom-variant fit (@media (min-width: 80rem) and (min-height: 50rem));
+/* "tight": modo fit em janelas baixas (até ~990px): some o que é detalhe pra caber o essencial */
+@custom-variant tight (@media (min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem));
+
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --color-bg: var(--bg);
@@ -279,4 +288,10 @@ main:focus {
     opacity: 0;
     transform: translateY(8px);
   }
+}
+
+/* rolagem interna dos cartões no modo "fit": barra fina, sem roubar espaço */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }

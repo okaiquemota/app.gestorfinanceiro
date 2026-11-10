@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownRight, ArrowUpRight, Check, ChevronRight, Pencil, TriangleAlert } from 'lucide-react'
 import {
   HOUSING,
@@ -24,33 +24,48 @@ export function Dashboard() {
   const pay = useMemo(() => payables(state, month), [state, month])
   const hasIncome = state.entries.some((e) => e.kind === 'income')
   const hasBills = state.entries.some((e) => e.kind === 'expense')
+  const onboarding = !hasIncome || !hasBills
 
   return (
-    <div className="space-y-4">
-      {(!hasIncome || !hasBills) && <Onboarding hasIncome={hasIncome} hasBills={hasBills} />}
-      <div className="flex flex-col gap-4 xl:flex-row">
+    // Com os primeiros passos na tela a página rola normalmente; depois disso,
+    // em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
+    <div className={cx('space-y-4', !onboarding && 'fit:flex fit:h-[calc(100dvh-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0')}>
+      {onboarding && <Onboarding hasIncome={hasIncome} hasBills={hasBills} />}
+      <div className="flex flex-col gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
         <div className="contents min-w-0 flex-1 xl:flex xl:flex-col xl:gap-4">
-          <div className="order-1 xl:order-none">
+          <div className="order-1 xl:order-none fit:shrink-0">
             <BalanceCard sum={sum} />
           </div>
-          <div className="order-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:order-none">
+          <div className={cx('order-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
             <BreakdownCard sum={sum} />
             <CardsCard sum={sum} />
           </div>
+          {!onboarding && (
+            <div className="hidden shrink-0 fit:block">
+              <ReserveStrip compact />
+            </div>
+          )}
         </div>
         <div className="contents xl:flex xl:w-[392px] xl:shrink-0 xl:flex-col xl:gap-4">
-          <div className="order-2 xl:order-none">
+          <div className={cx('order-2 xl:order-none', FILL)}>
             <PayablesCard list={pay} />
           </div>
-          <div className="order-4 xl:order-none">
+          <div className="order-4 xl:order-none fit:shrink-0">
             <HousingCard sum={sum} />
           </div>
         </div>
       </div>
-      <ReserveStrip />
+      <div className={cx(!onboarding && 'fit:hidden')}>
+        <ReserveStrip />
+      </div>
     </div>
   )
 }
+
+/** No modo "fit": ocupa a altura que sobrar. */
+const FILL = 'fit:min-h-0 fit:flex-1'
+/** No modo "fit": cartão do tamanho do espaço, rolando por dentro se precisar. */
+const SCROLL = 'scroll-thin fit:h-full fit:overflow-y-auto'
 
 // ---------- primeiros passos ----------
 
@@ -254,7 +269,7 @@ function PayablesCard({ list }: { list: Payable[] }) {
   const head = payablesHeadline(list)
 
   return (
-    <Panel className="flex flex-col p-5 sm:p-6">
+    <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
       <PanelHeader
         title="Contas a pagar"
         emoji="calendar-spiral"
@@ -362,18 +377,32 @@ function PayablesCard({ list }: { list: Payable[] }) {
 // ---------- para onde vai ----------
 
 const MAX_CATEGORIES = 7
+/** Em janelas baixas (variante "tight" do CSS) cabem menos linhas sem rolar o cartão. */
+const TIGHT = '(min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem)'
+const useMedia = (query: string): boolean => {
+  const [on, setOn] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const update = () => setOn(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [query])
+  return on
+}
 
 function BreakdownCard({ sum }: { sum: Summary }) {
+  const limit = useMedia(TIGHT) ? 5 : MAX_CATEGORIES
   // As maiores aparecem; o resto vira uma linha só — o cartão não cresce sem limite.
   const rows = useMemo(() => {
-    if (sum.byCategory.length <= MAX_CATEGORIES) return sum.byCategory
-    const top = sum.byCategory.slice(0, MAX_CATEGORIES - 1)
-    const rest = sum.byCategory.slice(MAX_CATEGORIES - 1)
+    if (sum.byCategory.length <= limit) return sum.byCategory
+    const top = sum.byCategory.slice(0, limit - 1)
+    const rest = sum.byCategory.slice(limit - 1)
     return [...top, { category: 'demais', amount: rest.reduce((t, c) => t + c.amount, 0), count: rest.length }]
-  }, [sum.byCategory])
+  }, [sum.byCategory, limit])
   const max = Math.max(0, ...rows.map((r) => r.amount))
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className={cx('p-5 sm:p-6', SCROLL)}>
       <PanelHeader title="Para onde vai" emoji="chart-bar">
         <p className="mt-3 text-caption text-muted">Total das saídas</p>
         <div className="mt-1">
@@ -385,7 +414,7 @@ function BreakdownCard({ sum }: { sum: Summary }) {
           Quando você cadastrar contas, o peso de cada categoria aparece aqui.
         </p>
       ) : (
-        <ul className="mt-5 space-y-3.5">
+        <ul className="mt-5 space-y-3.5 tight:mt-4 tight:space-y-2.5">
           {rows.map((row) => {
             const { category: id, amount } = row
             const cat = 'count' in row ? { label: `Outras ${row.count} categorias`, emoji: 'box' } : category(id)
@@ -429,7 +458,7 @@ function CardsCard({ sum }: { sum: Summary }) {
   const max = Math.max(1, ...upcoming.map((u) => u.total))
 
   return (
-    <Panel className="flex flex-col p-5 sm:p-6">
+    <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
       <PanelHeader title="Cartões" emoji="card">
         <p className="mt-3 text-caption text-muted">
           {state.cards.length > 1 ? 'Faturas' : 'Fatura'} de {monthLower(month)}
@@ -448,7 +477,7 @@ function CardsCard({ sum }: { sum: Summary }) {
         </div>
       ) : (
         <>
-          <div className="no-scrollbar -mx-5 mt-4 flex snap-x gap-3 overflow-x-auto px-5 py-1 sm:-mx-6 sm:px-6">
+          <div className="no-scrollbar -mx-5 mt-4 flex shrink-0 snap-x gap-3 overflow-x-auto px-5 py-1 sm:-mx-6 sm:px-6">
             {invoices.map((inv) => (
               <CardVisual
                 key={inv.card.id}
@@ -459,8 +488,9 @@ function CardsCard({ sum }: { sum: Summary }) {
             ))}
           </div>
 
-          <h3 className="mt-5 text-micro font-semibold tracking-[0.06em] text-faint">PRÓXIMAS FATURAS</h3>
-          <ol className="mt-2 grid grid-cols-3 gap-2">
+          {/* em janelas baixas ficam só os cartões; as próximas faturas estão na tela de Cartões */}
+          <h3 className="mt-5 text-micro font-semibold tracking-[0.06em] text-faint fit:mt-4 tight:hidden">PRÓXIMAS FATURAS</h3>
+          <ol className="mt-2 grid grid-cols-3 gap-2 tight:hidden">
             {upcoming.map((u, i) => (
               <li
                 key={u.month}
@@ -470,7 +500,7 @@ function CardsCard({ sum }: { sum: Summary }) {
                 )}
               >
                 <span className="text-caption font-semibold">{monthShort(u.month)}</span>
-                <span className="mt-2 flex h-14 items-end justify-center" aria-hidden>
+                <span className="mt-2 flex h-14 items-end justify-center fit:h-9" aria-hidden>
                   <span
                     className="w-7 rounded-t-[4px]"
                     style={{
@@ -487,7 +517,7 @@ function CardsCard({ sum }: { sum: Summary }) {
           </ol>
           <Link
             href="/cartoes"
-            className="mt-3 flex items-center justify-center gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft"
+            className="mt-3 flex items-center justify-center fit:mt-2 tight:hidden gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft"
           >
             Ver compras e parcelas <ChevronRight size={14} />
           </Link>
@@ -569,8 +599,8 @@ function HousingCard({ sum }: { sum: Summary }) {
               </div>
             </>
           )}
-          <h3 className="mt-5 text-caption font-semibold">O que entra na conta</h3>
-          <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
+          <h3 className="mt-5 text-caption font-semibold tight:hidden">O que entra na conta</h3>
+          <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 tight:hidden">
             {items.map((o) => (
               <li key={o.entry.id} className="min-w-0">
                 <button
@@ -592,7 +622,7 @@ function HousingCard({ sum }: { sum: Summary }) {
 
 // ---------- reserva ----------
 
-function ReserveStrip() {
+function ReserveStrip({ compact }: { compact?: boolean }) {
   const { state } = useStore()
   const [mode, setMode] = useState<'all' | 'open'>('all')
   if (state.goals.length === 0) return null
@@ -600,6 +630,44 @@ function ReserveStrip() {
     .map((g) => ({ goal: g, balance: goalBalance(state, g) }))
     .filter((g) => mode === 'all' || g.goal.target_cents === 0 || g.balance < g.goal.target_cents)
   const total = state.goals.reduce((s, g) => s + goalBalance(state, g), 0)
+
+  // Versão de uma linha, usada quando a Visão geral precisa caber na janela.
+  if (compact)
+    return (
+      <Link
+        href="/reserva"
+        className="flex items-center gap-4 rounded-panel border border-line bg-surface px-5 py-3 shadow-card hover:border-line-strong sm:px-6"
+      >
+        <Emoji name="money-bag" size={36} />
+        <span className="shrink-0">
+          <span className="block text-caption text-muted">Reserva</span>
+          <Amount cents={total} className="text-lead" />
+        </span>
+        <span className="flex min-w-0 flex-1 gap-5 overflow-hidden border-l border-line pl-5">
+          {state.goals.slice(0, 3).map((goal) => {
+            const balance = goalBalance(state, goal)
+            return (
+              <span key={goal.id} className="min-w-0 flex-1">
+                <span className="flex items-baseline justify-between gap-2 text-caption">
+                  <span className="truncate font-medium">{goal.name}</span>
+                  <span className="tnum shrink-0 text-muted">
+                    {goal.target_cents > 0 ? pct(balance, goal.target_cents) : brl(balance)}
+                  </span>
+                </span>
+                <Meter
+                  value={balance}
+                  max={goal.target_cents || balance || 1}
+                  color="var(--good-fill)"
+                  label={`${goal.name}: ${brl(balance)} guardados`}
+                  className="mt-1.5 !h-1.5"
+                />
+              </span>
+            )
+          })}
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-faint" />
+      </Link>
+    )
 
   return (
     <Panel className="p-5 sm:p-6">
