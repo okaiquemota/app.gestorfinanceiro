@@ -65,7 +65,7 @@ export function Bills() {
                 { value: 'paid', label: 'Pagas' },
               ]}
             />
-            <Button variant="primary" onClick={add} className="hidden sm:inline-flex">
+            <Button variant="primary" onClick={add} className="max-sm:hidden">
               <Plus size={16} strokeWidth={2.5} /> Nova conta
             </Button>
           </div>
