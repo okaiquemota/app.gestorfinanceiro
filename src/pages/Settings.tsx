@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Download, LogOut } from 'lucide-react'
+import { ChevronRight, Download, LogOut } from 'lucide-react'
 import { api } from '../lib/api.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
-import { Button, Field, Panel, Segmented, TextInput } from '../ui.tsx'
+import { Button, Emoji, Field, Panel, Segmented, TextInput } from '../ui.tsx'
 
 export function Settings() {
   const { state, run, theme, setTheme, logout, notify } = useStore()
@@ -21,19 +21,31 @@ export function Settings() {
     if (ok) {
       setCurrent('')
       setNext('')
-      notify('Senha alterada.')
+      notify('Senha alterada.', 'success')
     }
   }
 
   return (
     <div className="grid max-w-4xl gap-4 md:grid-cols-2">
+      {/* no celular o menu de baixo não tem "Minha renda": o atalho fica aqui, em destaque */}
+      <Link
+        href="/renda"
+        className="flex min-h-16 items-center gap-3 rounded-panel border border-line bg-surface p-4 shadow-card hover:border-line-strong md:col-span-2 lg:hidden"
+      >
+        <Emoji name="banknote" size={36} />
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">Minha renda</span>
+          <span className="block text-caption text-muted">Salário, outras entradas e o gasto do dia a dia.</span>
+        </span>
+        <ChevronRight size={18} className="text-faint" />
+      </Link>
       <Panel className="space-y-4 p-5 sm:p-6">
-        <h2 className="text-[15px] font-semibold">Perfil</h2>
+        <h2 className="text-lead font-semibold">Perfil</h2>
         <form
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault()
-            run(() => api('PUT', '/me', { name, daily_budget_cents: state.user.daily_budget_cents }))
+            run(() => api('PUT', '/me', { name, daily_budget_cents: state.user.daily_budget_cents }), { success: 'Nome salvo.' })
           }}
         >
           <Field label="Nome">
@@ -47,8 +59,9 @@ export function Settings() {
           </Button>
         </form>
         <div className="border-t border-line pt-4">
-          <p className="mb-2 text-[13px] font-semibold text-muted">Tema</p>
+          <p className="mb-2 text-caption font-semibold text-muted">Tema</p>
           <Segmented
+            label="Tema"
             value={theme}
             onChange={setTheme}
             options={[
@@ -57,14 +70,12 @@ export function Settings() {
             ]}
           />
         </div>
-        <Link href="/renda" className="block font-semibold text-primary lg:hidden">
-          Minha renda e gasto do dia a dia →
-        </Link>
+
       </Panel>
 
       <div className="space-y-4">
         <Panel className="p-5 sm:p-6">
-          <h2 className="text-[15px] font-semibold">Trocar senha</h2>
+          <h2 className="text-lead font-semibold">Trocar senha</h2>
           <form
             className="mt-4 space-y-4"
             onSubmit={(e) => {
@@ -85,8 +96,8 @@ export function Settings() {
         </Panel>
 
         <Panel className="p-5 sm:p-6">
-          <h2 className="text-[15px] font-semibold">Seus dados</h2>
-          <p className="mt-1 text-[13px] text-muted">Baixe uma cópia de tudo que está cadastrado, em JSON.</p>
+          <h2 className="text-lead font-semibold">Seus dados</h2>
+          <p className="mt-1 text-caption text-muted">Baixe uma cópia de tudo que está cadastrado, em JSON.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <a
               href="/api/export"

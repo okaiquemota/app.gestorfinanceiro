@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Trash2 } from 'lucide-react'
+import { CircleAlert, Trash2 } from 'lucide-react'
 import {
   addMonths,
   goalBalance,
@@ -12,7 +12,7 @@ import {
 } from '../shared/finance.ts'
 import type { Card, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { api } from './lib/api.ts'
-import { CARD_COLORS, CATEGORIES, GOAL_ICONS, category } from './lib/categories.ts'
+import { CARD_COLORS, CATEGORIES, GOAL_ICONS, GOAL_ICON_LABELS, category } from './lib/categories.ts'
 import { brl, dayMonth, monthLong, monthLower, monthTitle } from './lib/format.ts'
 import { useStore } from './store.tsx'
 import {
@@ -53,31 +53,45 @@ export function FormHost() {
   }
 }
 
-/** Estado de "salvando" + fechar ao concluir, comum a todos os formulários. */
+/**
+ * Comum a todos os formulários: estado de "salvando", fechar ao concluir e
+ * validação ao enviar. O botão de salvar fica sempre ativo; se faltar algo,
+ * `problem` vira uma mensagem dizendo o quê (em vez de um botão apagado
+ * sem explicação).
+ */
 const useSubmit = () => {
   const { run, closeForm } = useStore()
   const [busy, setBusy] = useState(false)
-  const submit = async (fn: () => Promise<unknown>) => {
+  const [error, setError] = useState<string | null>(null)
+  const submit = async (
+    fn: () => Promise<unknown>,
+    opts: { problem?: string | null | false; success?: string } = {},
+  ) => {
     if (busy) return
+    if (opts.problem) return setError(opts.problem)
+    setError(null)
     setBusy(true)
-    const ok = await run(fn)
+    const ok = await run(fn, { success: opts.success })
     setBusy(false)
     if (ok) closeForm()
   }
-  return { busy, submit }
+  return { busy, error, submit }
 }
 
 function Footer({
   busy,
-  disabled,
+  error,
   label = 'Salvar',
   onDelete,
+  deleteQuestion = 'Excluir de vez?',
   extra,
 }: {
   busy: boolean
-  disabled?: boolean
+  error?: string | null
   label?: string
   onDelete?: () => void
+  /** Pergunta de confirmação; diga o que mais some junto. */
+  deleteQuestion?: string
   extra?: ReactNode
 }) {
   const { closeForm } = useStore()
@@ -85,26 +99,36 @@ function Footer({
   if (confirming)
     return (
       <>
-        <span className="mr-auto text-sm font-semibold">Excluir de vez?</span>
-        <Button onClick={() => setConfirming(false)}>Não</Button>
-        <Button variant="primary" className="!bg-bad hover:!bg-bad" onClick={onDelete} disabled={busy}>
-          Sim, excluir
+        <span role="alert" className="mr-auto min-w-0 flex-1 text-sm font-semibold">
+          {deleteQuestion}
+        </span>
+        <Button onClick={() => setConfirming(false)} autoFocus>
+          Não
+        </Button>
+        <Button variant="destructive" onClick={onDelete} disabled={busy}>
+          {busy ? 'Excluindo…' : 'Sim, excluir'}
         </Button>
       </>
     )
   return (
     <>
+      {error && (
+        <p role="alert" className="flex w-full items-center gap-1.5 text-caption font-semibold text-bad">
+          <CircleAlert size={15} className="shrink-0" />
+          {error}
+        </p>
+      )}
       {onDelete && (
         <Button variant="danger" onClick={() => setConfirming(true)} aria-label="Excluir" className="mr-auto !px-3">
           <Trash2 size={16} />
-          <span className="hidden sm:inline">Excluir</span>
+          <span className="max-sm:hidden">Excluir</span>
         </Button>
       )}
       {extra}
       <Button onClick={closeForm} className={cx(!onDelete && !extra && 'ml-auto')}>
         Cancelar
       </Button>
-      <Button type="submit" variant="primary" disabled={busy || disabled}>
+      <Button type="submit" variant="primary" disabled={busy} aria-busy={busy}>
         {busy ? 'Salvando…' : label}
       </Button>
     </>
@@ -122,7 +146,7 @@ function CategoryPicker({ value, onChange }: { value: string; onChange: (id: str
           aria-checked={c.id === value}
           onClick={() => onChange(c.id)}
           className={cx(
-            'flex flex-col items-center gap-1 rounded-xl border px-1 py-2 text-[11px] font-semibold leading-tight transition-colors',
+            'flex flex-col items-center gap-1 rounded-xl border px-1 py-2 text-micro font-semibold leading-tight transition-colors',
             c.id === value
               ? 'border-primary bg-primary-soft text-fg'
               : 'border-line text-muted hover:border-line-strong hover:text-fg',
@@ -145,9 +169,10 @@ const repeatOf = (e?: Entry): Repeat =>
 
 function EntryForm({ kind, entry, preset }: { kind: EntryKind; entry?: Entry; preset?: Partial<Entry> }) {
   const { state, month, closeForm } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const base = { ...preset, ...entry }
   const income = kind === 'income'
+  const noun = income ? 'a renda' : 'a conta'
 
   const [name, setName] = useState(base.name ?? '')
   const [amount, setAmount] = useState(base.amount_cents ?? 0)
@@ -179,20 +204,30 @@ function EntryForm({ kind, entry, preset }: { kind: EntryKind; entry?: Entry; pr
   // "Encerrar": a conta para de aparecer a partir do mês que está na tela.
   const canEnd = entry && entry.end_month === null && entry.start_month < month
   const endIt = () =>
-    submit(() => api('PUT', `/entries/${entry!.id}`, { ...entry, end_month: addMonths(month, -1) }))
+    submit(() => api('PUT', `/entries/${entry!.id}`, { ...entry, end_month: addMonths(month, -1) }), {
+      success: `Encerrada: não aparece mais a partir de ${monthLong(month)}.`,
+    })
 
   return (
     <Modal
       title={entry ? (income ? 'Editar renda' : 'Editar conta') : income ? 'Nova renda' : 'Nova conta'}
       onClose={closeForm}
       onSubmit={() =>
-        submit(() => (entry ? api('PUT', `/entries/${entry.id}`, payload) : api('POST', '/entries', payload)))
+        submit(() => (entry ? api('PUT', `/entries/${entry.id}`, payload) : api('POST', '/entries', payload)), {
+          problem: amount <= 0 ? 'Informe o valor.' : !name.trim() ? `Dê um nome pra ${noun}.` : null,
+          success: entry ? 'Alterações salvas.' : income ? 'Renda adicionada.' : 'Conta adicionada.',
+        })
       }
       footer={
         <Footer
           busy={busy}
-          disabled={!name.trim() || amount <= 0}
-          onDelete={entry ? () => submit(() => api('DELETE', `/entries/${entry.id}`)) : undefined}
+          error={error}
+          deleteQuestion={`Excluir ${noun} de todos os meses?`}
+          onDelete={
+            entry
+              ? () => submit(() => api('DELETE', `/entries/${entry.id}`), { success: income ? 'Renda excluída.' : 'Conta excluída.' })
+              : undefined
+          }
           extra={
             canEnd ? (
               <Button variant="ghost" onClick={endIt} title={`Para de aparecer a partir de ${monthLong(month)}`}>
@@ -203,7 +238,9 @@ function EntryForm({ kind, entry, preset }: { kind: EntryKind; entry?: Entry; pr
         />
       }
     >
-      <MoneyInput cents={amount} onChange={setAmount} autoFocus={!entry} large />
+      <Field label={repeat === 'installments' && !income ? 'Valor de cada parcela' : repeat === 'monthly' ? 'Valor por mês' : 'Valor'}>
+        <MoneyInput cents={amount} onChange={setAmount} autoFocus={!entry} large />
+      </Field>
       <Field label={income ? 'De onde vem' : 'Nome da conta'}>
         <TextInput
           value={name}
@@ -294,7 +331,7 @@ function EntryForm({ kind, entry, preset }: { kind: EntryKind; entry?: Entry; pr
 
 function OccurrenceForm({ entryId, month }: { entryId: string; month: string }) {
   const { state, openForm, closeForm } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const occ = occurrences(state, month).find((o) => o.entry.id === entryId)
   const [amount, setAmount] = useState(occ?.amount ?? 0)
   const [paid, setPaid] = useState(occ?.paid ?? false)
@@ -320,6 +357,7 @@ function OccurrenceForm({ entryId, month }: { entryId: string; month: string }) 
       footer={
         <Footer
           busy={busy}
+          error={error}
           extra={
             <Button variant="ghost" className="mr-auto" onClick={() => openForm({ type: 'entry', kind: entry.kind, entry })}>
               Editar {income ? 'renda' : 'conta'}
@@ -338,7 +376,7 @@ function OccurrenceForm({ entryId, month }: { entryId: string; month: string }) 
           amount !== entry.amount_cents ? (
             <>
               Vale só para este mês. O valor padrão é {brl(entry.amount_cents)}.{' '}
-              <button type="button" className="font-semibold text-primary" onClick={() => setAmount(entry.amount_cents)}>
+              <button type="button" className="font-semibold text-accent" onClick={() => setAmount(entry.amount_cents)}>
                 Voltar ao padrão
               </button>
             </>
@@ -372,7 +410,7 @@ function OccurrenceForm({ entryId, month }: { entryId: string; month: string }) 
 
 function CardForm({ card }: { card?: Card }) {
   const { closeForm } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const [name, setName] = useState(card?.name ?? '')
   const [color, setColor] = useState(card?.color ?? 'graphite')
   const [last4, setLast4] = useState(card?.last4 ?? '')
@@ -386,13 +424,21 @@ function CardForm({ card }: { card?: Card }) {
       title={card ? 'Editar cartão' : 'Novo cartão'}
       onClose={closeForm}
       onSubmit={() =>
-        submit(() => (card ? api('PUT', `/cards/${card.id}`, payload) : api('POST', '/cards', payload)))
+        submit(() => (card ? api('PUT', `/cards/${card.id}`, payload) : api('POST', '/cards', payload)), {
+          problem: !name.trim()
+            ? 'Dê um nome pro cartão.'
+            : last4 !== '' && last4.length !== 4
+              ? 'O final do cartão precisa ter 4 dígitos (ou fique em branco).'
+              : null,
+          success: card ? 'Alterações salvas.' : 'Cartão adicionado.',
+        })
       }
       footer={
         <Footer
           busy={busy}
-          disabled={!name.trim() || (last4 !== '' && last4.length !== 4)}
-          onDelete={card ? () => submit(() => api('DELETE', `/cards/${card.id}`)) : undefined}
+          error={error}
+          deleteQuestion="Excluir o cartão e todas as compras dele?"
+          onDelete={card ? () => submit(() => api('DELETE', `/cards/${card.id}`), { success: 'Cartão excluído.' }) : undefined}
         />
       }
     >
@@ -454,7 +500,7 @@ type PurchaseMode = 'single' | 'installments' | 'recurring'
 
 function PurchaseForm({ purchase, cardId }: { purchase?: Purchase; cardId?: string }) {
   const { state, closeForm } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const [card, setCard] = useState(purchase?.card_id ?? cardId ?? state.cards[0]?.id ?? '')
   const [desc, setDesc] = useState(purchase?.description ?? '')
   const [amount, setAmount] = useState(purchase?.amount_cents ?? 0)
@@ -490,17 +536,26 @@ function PurchaseForm({ purchase, cardId }: { purchase?: Purchase; cardId?: stri
       onSubmit={() =>
         submit(() =>
           purchase ? api('PUT', `/purchases/${purchase.id}`, payload) : api('POST', '/purchases', payload),
+          {
+            problem: amount <= 0 ? 'Informe o valor.' : !desc.trim() ? 'Diga o que foi a compra.' : !card ? 'Escolha um cartão.' : null,
+            success: purchase ? 'Alterações salvas.' : 'Compra adicionada.',
+          },
         )
       }
       footer={
         <Footer
           busy={busy}
-          disabled={!desc.trim() || amount <= 0 || !card}
-          onDelete={purchase ? () => submit(() => api('DELETE', `/purchases/${purchase.id}`)) : undefined}
+          error={error}
+          deleteQuestion="Excluir a compra de todas as faturas?"
+          onDelete={
+            purchase ? () => submit(() => api('DELETE', `/purchases/${purchase.id}`), { success: 'Compra excluída.' }) : undefined
+          }
         />
       }
     >
-      <MoneyInput cents={amount} onChange={setAmount} autoFocus={!purchase} large />
+      <Field label={mode === 'recurring' ? 'Valor por mês' : mode === 'installments' ? 'Valor total da compra' : 'Valor'}>
+        <MoneyInput cents={amount} onChange={setAmount} autoFocus={!purchase} large />
+      </Field>
       <Field label="O que foi">
         <TextInput value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Ex.: Geladeira, Netflix" maxLength={120} />
       </Field>
@@ -578,7 +633,7 @@ function PurchaseForm({ purchase, cardId }: { purchase?: Purchase; cardId?: stri
 
 function InvoiceForm({ cardId, month }: { cardId: string; month: string }) {
   const { state, closeForm } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const card = state.cards.find((c) => c.id === cardId)
   const inv = useMemo(() => (card ? invoiceFor(state, card, month) : null), [state, card, month])
   const [manual, setManual] = useState(inv?.manual ?? false)
@@ -595,7 +650,7 @@ function InvoiceForm({ cardId, month }: { cardId: string; month: string }) {
           api('PUT', `/cards/${card.id}/invoices/${month}`, { amount_cents: manual ? amount : null, paid }),
         )
       }
-      footer={<Footer busy={busy} />}
+      footer={<Footer busy={busy} error={error} />}
     >
       <p className="-mt-2 text-muted">
         {monthTitle(month)} · vence em {dayMonth(month, inv.day)}
@@ -627,7 +682,7 @@ function InvoiceForm({ cardId, month }: { cardId: string; month: string }) {
 
 function GoalForm({ goal }: { goal?: Goal }) {
   const { closeForm, month } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const [name, setName] = useState(goal?.name ?? '')
   const [icon, setIcon] = useState(goal?.icon ?? 'umbrella')
   const [target, setTarget] = useState(goal?.target_cents ?? 0)
@@ -640,13 +695,17 @@ function GoalForm({ goal }: { goal?: Goal }) {
       title={goal ? 'Editar meta' : 'Nova meta'}
       onClose={closeForm}
       onSubmit={() =>
-        submit(() => (goal ? api('PUT', `/goals/${goal.id}`, payload) : api('POST', '/goals', payload)))
+        submit(() => (goal ? api('PUT', `/goals/${goal.id}`, payload) : api('POST', '/goals', payload)), {
+          problem: !name.trim() ? 'Dê um nome pra meta.' : null,
+          success: goal ? 'Alterações salvas.' : 'Meta criada.',
+        })
       }
       footer={
         <Footer
           busy={busy}
-          disabled={!name.trim()}
-          onDelete={goal ? () => submit(() => api('DELETE', `/goals/${goal.id}`)) : undefined}
+          error={error}
+          deleteQuestion="Excluir a meta e todo o histórico dela?"
+          onDelete={goal ? () => submit(() => api('DELETE', `/goals/${goal.id}`), { success: 'Meta excluída.' }) : undefined}
         />
       }
     >
@@ -667,7 +726,8 @@ function GoalForm({ goal }: { goal?: Goal }) {
               type="button"
               role="radio"
               aria-checked={i === icon}
-              aria-label={i}
+              aria-label={GOAL_ICON_LABELS[i] ?? i}
+              title={GOAL_ICON_LABELS[i] ?? i}
               onClick={() => setIcon(i)}
               className={cx(
                 'flex aspect-square items-center justify-center rounded-xl border transition-colors',
@@ -694,7 +754,7 @@ function GoalForm({ goal }: { goal?: Goal }) {
 
 function MoveForm({ goalId, direction }: { goalId: string; direction: 'in' | 'out' }) {
   const { state, closeForm } = useStore()
-  const { busy, submit } = useSubmit()
+  const { busy, error, submit } = useSubmit()
   const goal = state.goals.find((g) => g.id === goalId)
   const [dir, setDir] = useState(direction)
   const [amount, setAmount] = useState(0)
@@ -714,9 +774,18 @@ function MoveForm({ goalId, direction }: { goalId: string; direction: 'in' | 'ou
             date,
             note,
           }),
+          {
+            problem:
+              amount <= 0
+                ? 'Informe o valor.'
+                : dir === 'out' && amount > balance
+                  ? `Não dá pra retirar mais do que tem guardado (${brl(balance)}).`
+                  : null,
+            success: dir === 'in' ? 'Valor guardado.' : 'Retirada registrada.',
+          },
         )
       }
-      footer={<Footer busy={busy} disabled={amount <= 0} label={dir === 'in' ? 'Guardar' : 'Retirar'} />}
+      footer={<Footer busy={busy} error={error} label={dir === 'in' ? 'Guardar' : 'Retirar'} />}
     >
       <p className="-mt-2 text-muted">Guardado até agora: {brl(balance)}</p>
       <Segmented
@@ -727,7 +796,9 @@ function MoveForm({ goalId, direction }: { goalId: string; direction: 'in' | 'ou
           { value: 'out', label: 'Retirar' },
         ]}
       />
-      <MoneyInput cents={amount} onChange={setAmount} large autoFocus />
+      <Field label={dir === 'in' ? 'Quanto vai guardar' : 'Quanto vai retirar'}>
+        <MoneyInput cents={amount} onChange={setAmount} large autoFocus />
+      </Field>
       <Field label="Data">
         <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </Field>

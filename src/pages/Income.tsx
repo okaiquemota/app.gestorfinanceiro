@@ -18,7 +18,7 @@ export function Income() {
 
   const saveDaily = async () => {
     setBusy(true)
-    await run(() => api('PUT', '/me', { name: state.user.name, daily_budget_cents: daily }))
+    await run(() => api('PUT', '/me', { name: state.user.name, daily_budget_cents: daily }), { success: 'Gasto do dia a dia salvo.' })
     setBusy(false)
   }
   const add = () => openForm({ type: 'entry', kind: 'income' })
@@ -26,10 +26,10 @@ export function Income() {
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_392px]">
       <Panel className="p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-semibold">Minha renda</h2>
-            <p className="mt-3 text-[13px] text-muted">Entra em {monthLower(month)}</p>
+            <h2 className="text-lead font-semibold">Minha renda</h2>
+            <p className="mt-3 text-caption text-muted">Entra em {monthLower(month)}</p>
             <Money cents={total} className="mt-1" />
           </div>
           <Button variant="primary" onClick={add}>
@@ -48,7 +48,7 @@ export function Income() {
                 <button
                   type="button"
                   onClick={() => openForm({ type: 'occurrence', entryId: o.entry.id, month })}
-                  className="group flex w-full items-center gap-3 py-3 text-left"
+                  className="group flex min-h-12 w-full items-center gap-3 py-3 text-left"
                 >
                   <Emoji name="banknote" size={32} className={o.skipped ? 'opacity-40' : undefined} />
                   <span className="min-w-0 flex-1">
@@ -75,8 +75,8 @@ export function Income() {
       <Panel className="self-start p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-semibold">Dia a dia</h2>
-            <p className="mt-1 text-[13px] text-muted">
+            <h2 className="text-lead font-semibold">Dia a dia</h2>
+            <p className="mt-1 text-caption text-muted">
               Quanto você separa por mês pro que não é conta fixa: mercado, gasolina, lanche, farmácia.
             </p>
           </div>
@@ -89,7 +89,7 @@ export function Income() {
             saveDaily()
           }}
         >
-          <MoneyInput cents={daily} onChange={setDaily} large />
+          <MoneyInput cents={daily} onChange={setDaily} large ariaLabel="Gasto do dia a dia por mês" />
           <Button type="submit" variant="primary" className="w-full" disabled={busy || daily === saved}>
             {busy ? 'Salvando…' : daily === saved ? 'Salvo' : 'Salvar'}
           </Button>

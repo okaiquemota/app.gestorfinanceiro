@@ -39,7 +39,7 @@ export function Auth({ status, onDone }: { status: AuthStatus; onDone: () => voi
           </p>
         </div>
         <form
-          className="mt-6 space-y-4 rounded-[20px] border border-line bg-surface p-5 shadow-card sm:p-6"
+          className="mt-6 space-y-4 rounded-panel border border-line bg-surface p-5 shadow-card sm:p-6"
           onSubmit={(e) => {
             e.preventDefault()
             submit()

@@ -4,7 +4,7 @@ import { Meter } from '../components.tsx'
 import { api } from '../lib/api.ts'
 import { brl, currentMonth, dateBR, monthLong, pct } from '../lib/format.ts'
 import { useStore } from '../store.tsx'
-import { Amount, Button, Emoji, EmptyState, IconButton, Money, Panel, cx } from '../ui.tsx'
+import { Amount, Button, ConfirmButton, Emoji, EmptyState, IconButton, Money, Panel, cx } from '../ui.tsx'
 
 export function Reserve() {
   const { state, openForm, run } = useStore()
@@ -33,9 +33,9 @@ export function Reserve() {
 
   return (
     <div className="space-y-4">
-      <Panel className="flex items-center justify-between gap-4 p-5 sm:p-6">
+      <Panel className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
         <div>
-          <p className="text-[13px] text-muted">Total guardado</p>
+          <p className="text-caption text-muted">Total guardado</p>
           <Money cents={total} className="mt-1" />
         </div>
         <div className="flex items-center gap-4">
@@ -56,7 +56,7 @@ export function Reserve() {
               <div className="flex items-start gap-3">
                 <Emoji name={goal.icon} size={48} />
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-[15px] font-semibold">{goal.name}</h2>
+                  <h2 className="truncate text-lead font-semibold">{goal.name}</h2>
                   <Money cents={balance} size="lg" className="mt-1.5" />
                 </div>
                 <IconButton label={`Editar ${goal.name}`} onClick={() => openForm({ type: 'goal', goal })} className="-mr-2 -mt-1">
@@ -76,7 +76,7 @@ export function Reserve() {
                     <span className="font-semibold text-fg">{pct(balance, goal.target_cents)}</span>
                     <span>meta de {brl(goal.target_cents)}</span>
                   </p>
-                  <p className="mt-2 text-[13px] text-muted">
+                  <p className="mt-2 text-caption text-muted">
                     {left <= 0
                       ? 'Meta batida 🎉'
                       : goal.deadline && months > 0
@@ -99,7 +99,7 @@ export function Reserve() {
       </div>
 
       <Panel className="p-5 sm:p-6">
-        <h2 className="text-[15px] font-semibold">Histórico</h2>
+        <h2 className="text-lead font-semibold">Histórico</h2>
         {state.goalMoves.length === 0 ? (
           <p className="py-8 text-center text-muted">Nada guardado ainda. Use “Guardar” em uma das metas.</p>
         ) : (
@@ -108,7 +108,7 @@ export function Reserve() {
               <li key={m.id} className="flex items-center gap-3 py-2.5">
                 <span
                   className={cx(
-                    'flex size-8 shrink-0 items-center justify-center rounded-full',
+                    'flex size-8 shrink-0 items-center justify-center rounded-full max-[380px]:hidden',
                     m.amount_cents >= 0 ? 'bg-good-soft text-good' : 'bg-bad-soft text-bad',
                   )}
                 >
@@ -124,11 +124,14 @@ export function Reserve() {
                 <Amount cents={m.amount_cents} className={m.amount_cents < 0 ? 'text-bad' : undefined} />
                 {/* depósitos que vieram de uma conta paga se desfazem desmarcando a conta */}
                 {m.entry_id ? (
-                  <span className="size-9" />
+                  <span className="size-10 max-sm:hidden" />
                 ) : (
-                  <IconButton label="Excluir movimentação" onClick={() => run(() => api('DELETE', `/goal-moves/${m.id}`))}>
+                  <ConfirmButton
+                    label="Excluir movimentação"
+                    onConfirm={() => run(() => api('DELETE', `/goal-moves/${m.id}`), { success: 'Movimentação excluída.' })}
+                  >
                     <Trash2 size={15} />
-                  </IconButton>
+                  </ConfirmButton>
                 )}
               </li>
             ))}

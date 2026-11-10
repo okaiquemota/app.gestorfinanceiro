@@ -1,7 +1,6 @@
-import { useEffect, useId, useLayoutEffect, useRef } from 'react'
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react'
-import { Check, X } from 'lucide-react'
-import { addMonths } from '../shared/finance.ts'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes } from 'react'
+import { Check, CircleAlert, X } from 'lucide-react'
 import { monthNames, monthParts, splitBRL } from './lib/format.ts'
 
 export const cx = (...parts: (string | false | null | undefined)[]): string =>
@@ -10,7 +9,8 @@ export const cx = (...parts: (string | false | null | undefined)[]): string =>
 // ---------- dinheiro ----------
 
 const MONEY_SIZES = {
-  hero: { int: 'text-[44px] sm:text-[56px] leading-none tracking-[-0.035em]', small: 'text-xl sm:text-2xl' },
+  // cresce com a tela, mas nunca estoura um celular de 320px
+  hero: { int: 'text-[clamp(2.25rem,10.5vw,3.25rem)] leading-none tracking-[-0.035em]', small: 'text-lg sm:text-xl' },
   xl: { int: 'text-[30px] sm:text-[34px] leading-none tracking-[-0.03em]', small: 'text-sm' },
   lg: { int: 'text-2xl leading-none tracking-[-0.02em]', small: 'text-xs' },
 }
@@ -31,7 +31,7 @@ export function Money({
   const s = MONEY_SIZES[size]
   return (
     <span className={cx('tnum inline-flex items-baseline whitespace-nowrap font-semibold', className)}>
-      <span className={cx(s.int, 'mr-[0.18em] text-faint')}>
+      <span className={cx(s.int, 'mr-[0.18em] text-ghost')}>
         {approx ? '≈ ' : ''}
         {neg ? '−' : ''}R$
       </span>
@@ -56,7 +56,7 @@ export function Amount({ cents, approx, className }: { cents: number; approx?: b
 
 export function Panel({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <section className={cx('min-w-0 rounded-[20px] border border-line bg-surface shadow-card', className)}>
+    <section className={cx('min-w-0 rounded-panel border border-line bg-surface shadow-card', className)}>
       {children}
     </section>
   )
@@ -101,10 +101,11 @@ export function EmptyState({
 // ---------- botões ----------
 
 const BTN = {
-  primary: 'bg-primary text-on-primary hover:bg-primary-hover disabled:opacity-50',
-  secondary: 'border border-line-strong bg-surface text-fg hover:bg-sunken disabled:opacity-50',
-  ghost: 'text-muted hover:bg-sunken hover:text-fg',
-  danger: 'text-bad hover:bg-bad-soft',
+  primary: 'bg-primary text-on-primary hover:bg-primary-hover active:bg-primary-hover',
+  secondary: 'border border-line-strong bg-surface text-fg hover:bg-sunken active:bg-sunken',
+  ghost: 'text-muted hover:bg-sunken hover:text-fg active:bg-sunken',
+  danger: 'text-bad hover:bg-bad-soft active:bg-bad-soft',
+  destructive: 'bg-bad text-white hover:opacity-90',
 }
 
 export function Button({
@@ -118,10 +119,10 @@ export function Button({
       type="button"
       {...rest}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl font-semibold transition-colors',
-        size === 'sm' && 'h-8 px-3 text-[13px]',
+        'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        size === 'sm' && 'h-9 px-3 text-caption',
         size === 'md' && 'h-10 px-4 text-sm',
-        size === 'lg' && 'h-12 px-5 text-[15px]',
+        size === 'lg' && 'h-12 px-5 text-lead',
         BTN[variant],
         className,
       )}
@@ -142,7 +143,7 @@ export function IconButton({
       title={label}
       {...rest}
       className={cx(
-        'inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-sunken hover:text-fg disabled:opacity-40',
+        'inline-flex size-10 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-sunken hover:text-fg active:bg-sunken disabled:opacity-40',
         className,
       )}
     >
@@ -173,14 +174,14 @@ export function CheckCircle({
         onChange(!checked)
       }}
       // área de toque maior que o círculo
-      className="group -m-2 flex size-10 shrink-0 items-center justify-center rounded-full"
+      className="group -m-2.5 flex size-11 shrink-0 items-center justify-center rounded-full"
     >
       <span
         className={cx(
-          'flex size-[22px] items-center justify-center rounded-full border-[1.5px] transition-colors',
+          'flex size-[22px] items-center justify-center rounded-full border-[1.5px] transition-[background-color,border-color,transform] duration-150 group-active:scale-90',
           checked
             ? 'border-good-fill bg-good-fill text-white'
-            : 'border-line-strong text-transparent group-hover:border-primary',
+            : 'border-control text-transparent group-hover:border-accent',
         )}
       >
         <Check size={14} strokeWidth={3} />
@@ -194,23 +195,38 @@ export function Segmented<T extends string>({
   onChange,
   options,
   className,
+  label,
 }: {
   value: T
   onChange: (v: T) => void
   options: { value: T; label: string }[]
   className?: string
+  /** Nome do grupo para leitores de tela, quando não há rótulo visível por perto. */
+  label?: string
 }) {
+  // Grupo de rádio de verdade: Tab entra na opção marcada, setas trocam.
+  const move = (e: KeyboardEvent<HTMLDivElement>) => {
+    const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0
+    if (!dir) return
+    e.preventDefault()
+    const i = options.findIndex((o) => o.value === value)
+    const next = options[(i + dir + options.length) % options.length]
+    onChange(next.value)
+    const buttons = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+    buttons[options.indexOf(next)]?.focus()
+  }
   return (
-    <div role="radiogroup" className={cx('flex rounded-xl bg-sunken p-1', className)}>
+    <div role="radiogroup" aria-label={label} onKeyDown={move} className={cx('flex rounded-xl bg-sunken p-1', className)}>
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           role="radio"
           aria-checked={o.value === value}
+          tabIndex={o.value === value ? 0 : -1}
           onClick={() => onChange(o.value)}
           className={cx(
-            'h-8 flex-1 whitespace-nowrap rounded-lg px-3 text-[13px] font-semibold transition-colors',
+            'h-9 flex-1 whitespace-nowrap rounded-lg px-3 text-caption font-semibold transition-colors',
             o.value === value ? 'bg-surface text-fg shadow-card' : 'text-muted hover:text-fg',
           )}
         >
@@ -225,12 +241,12 @@ export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'good
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold',
+        'inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-micro font-semibold',
         tone === 'neutral' && 'bg-sunken text-muted',
         tone === 'good' && 'bg-good-soft text-good',
         tone === 'warn' && 'bg-warn-soft text-warn',
         tone === 'bad' && 'bg-bad-soft text-bad',
-        tone === 'primary' && 'bg-primary-soft text-primary',
+        tone === 'primary' && 'bg-primary-soft text-accent',
       )}
     >
       {children}
@@ -242,7 +258,7 @@ export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'good
 
 // 16px no texto: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo.
 const INPUT =
-  'h-11 w-full min-w-0 rounded-xl border border-line-strong bg-surface px-3 text-base text-fg placeholder:text-faint focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+  'h-11 w-full min-w-0 rounded-xl border border-control bg-surface px-3 text-base text-fg transition-[border-color,box-shadow] placeholder:text-faint hover:border-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:border-line-strong'
 
 /**
  * Rótulo + controle. Com `group`, o conteúdo tem vários controles (botões de
@@ -262,7 +278,7 @@ export function Field({
 }) {
   const body = (
     <>
-      <span className="mb-1.5 block text-[13px] font-semibold text-muted">{label}</span>
+      <span className="mb-1.5 block text-caption font-semibold text-muted">{label}</span>
       {children}
       {hint && <span className="mt-1.5 block text-xs text-faint">{hint}</span>}
     </>
@@ -281,7 +297,7 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cx(INPUT, 'appearance-auto pr-2', props.className)} />
+  return <select {...props} className={cx(INPUT, 'field', props.className)} />
 }
 
 /**
@@ -293,11 +309,14 @@ export function MoneyInput({
   onChange,
   autoFocus,
   large,
+  ariaLabel,
 }: {
   cents: number
   onChange: (cents: number) => void
   autoFocus?: boolean
   large?: boolean
+  /** Só quando o campo não está dentro de um <Field> com rótulo visível. */
+  ariaLabel?: string
 }) {
   const ref = useRef<HTMLInputElement>(null)
   const { int, dec } = splitBRL(cents)
@@ -318,7 +337,7 @@ export function MoneyInput({
       <span
         className={cx(
           'pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-faint',
-          large ? 'text-xl' : 'text-[15px]',
+          large ? 'text-xl' : 'text-lead',
         )}
       >
         R$
@@ -328,7 +347,7 @@ export function MoneyInput({
         inputMode="numeric"
         autoComplete="off"
         autoFocus={autoFocus}
-        aria-label="Valor em reais"
+        aria-label={ariaLabel}
         value={value}
         onChange={(e) => {
           const digits = e.target.value.replace(/\D/g, '').slice(0, 12)
@@ -412,7 +431,7 @@ export function Toggle({
         onClick={() => onChange(!checked)}
         className={cx(
           'relative h-7 w-12 shrink-0 rounded-full transition-colors',
-          checked ? 'bg-primary' : 'bg-line-strong',
+          checked ? 'bg-primary' : 'bg-control',
         )}
       >
         <span
@@ -442,6 +461,10 @@ export function Modal({
   onSubmit?: () => void
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
+  // Depois que a pessoa mexe em algo, tocar fora não fecha mais: evita perder
+  // o que foi digitado por um toque sem querer. Esc, "Cancelar" e o X continuam valendo.
+  const touched = useRef(false)
 
   useEffect(() => {
     const el = ref.current
@@ -453,13 +476,19 @@ export function Modal({
     <dialog
       ref={ref}
       className="sheet"
+      aria-labelledby={titleId}
+      onInput={() => (touched.current = true)}
       onCancel={(e) => {
         e.preventDefault()
         onClose()
       }}
       onClick={(e) => {
-        // clique no fundo escuro (fora do conteúdo) fecha
-        if (e.target === ref.current) onClose()
+        if (e.target === ref.current) {
+          // clique no fundo escuro (fora do conteúdo)
+          if (!touched.current) onClose()
+        } else if ((e.target as HTMLElement).closest('.sheet-body button')) {
+          touched.current = true
+        }
       }}
     >
       <form
@@ -470,14 +499,16 @@ export function Modal({
         }}
       >
         <header className="flex shrink-0 items-center justify-between gap-3 px-5 pb-1 pt-4">
-          <h2 className="text-lg font-semibold tracking-[-0.01em]">{title}</h2>
+          <h2 id={titleId} className="truncate text-lg font-semibold tracking-[-0.01em]">
+            {title}
+          </h2>
           <IconButton label="Fechar" onClick={onClose} className="-mr-2">
             <X size={18} />
           </IconButton>
         </header>
         <div className="sheet-body space-y-4 px-5 py-4">{children}</div>
         {footer && (
-          <footer className="flex shrink-0 items-center gap-2 border-t border-line px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <footer className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
             {footer}
           </footer>
         )}
@@ -486,5 +517,57 @@ export function Modal({
   )
 }
 
-export const prevMonth = (m: string) => addMonths(m, -1)
-export const nextMonth = (m: string) => addMonths(m, 1)
+// ---------- confirmação e avisos ----------
+
+/** Ação destrutiva em dois toques: o primeiro pede confirmação no próprio lugar. */
+export function ConfirmButton({
+  label,
+  confirmLabel = 'Excluir?',
+  onConfirm,
+  children,
+}: {
+  label: string
+  confirmLabel?: string
+  onConfirm: () => void
+  children: ReactNode
+}) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const t = window.setTimeout(() => setArmed(false), 4000)
+    return () => window.clearTimeout(t)
+  }, [armed])
+  return armed ? (
+    <Button variant="destructive" size="sm" onClick={onConfirm} onBlur={() => setArmed(false)} autoFocus>
+      {confirmLabel}
+    </Button>
+  ) : (
+    <IconButton label={label} onClick={() => setArmed(true)}>
+      {children}
+    </IconButton>
+  )
+}
+
+export type ToastData = { message: string; tone: 'error' | 'success' }
+
+export function Toast({ toast, onClose }: { toast: ToastData; onClose: () => void }) {
+  const error = toast.tone === 'error'
+  return (
+    <div
+      // erro interrompe o leitor de tela; sucesso espera a vez
+      role={error ? 'alert' : 'status'}
+      className="fixed inset-x-4 bottom-[calc(76px+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-sm animate-[toast-in_0.18s_ease-out] items-center gap-2.5 rounded-2xl bg-fg py-2 pl-3.5 pr-1.5 text-sm font-semibold text-surface shadow-pop lg:bottom-6"
+    >
+      {error ? <CircleAlert size={18} className="shrink-0" /> : <Check size={18} strokeWidth={3} className="shrink-0" />}
+      <span className="min-w-0 flex-1 py-1.5">{toast.message}</span>
+      <button
+        type="button"
+        aria-label="Fechar aviso"
+        onClick={onClose}
+        className="flex size-9 shrink-0 items-center justify-center rounded-xl opacity-70 hover:opacity-100"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  )
+}

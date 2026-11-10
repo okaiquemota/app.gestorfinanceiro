@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { AppState, Card, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { ApiError, api } from './lib/api.ts'
 import { currentMonth } from './lib/format.ts'
+import type { ToastData } from './ui.tsx'
 
 export type FormSpec =
   | { type: 'entry'; kind: EntryKind; entry?: Entry; preset?: Partial<Entry> }
@@ -23,14 +24,18 @@ type Store = {
    * Executa uma escrita na API e recarrega os dados. `patch` aplica a mudança
    * na tela na hora (ex.: marcar conta paga) antes da resposta chegar.
    */
-  run: (fn: () => Promise<unknown>, patch?: (s: AppState) => AppState) => Promise<boolean>
+  run: (
+    fn: () => Promise<unknown>,
+    opts?: { patch?: (s: AppState) => AppState; success?: string },
+  ) => Promise<boolean>
   form: FormSpec | null
   openForm: (f: FormSpec) => void
   closeForm: () => void
   theme: Theme
   setTheme: (t: Theme) => void
-  toast: string | null
-  notify: (msg: string) => void
+  toast: ToastData | null
+  notify: (message: string, tone?: ToastData['tone']) => void
+  dismissToast: () => void
   logout: () => Promise<void>
 }
 
@@ -54,17 +59,19 @@ export function StoreProvider({
   const [state, setState] = useState(initial)
   const [month, setMonth] = useState(currentMonth)
   const [form, setForm] = useState<FormSpec | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastData | null>(null)
   const [theme, setThemeState] = useState<Theme>(
     () => (document.documentElement.dataset.theme as Theme) ?? 'light',
   )
   const timer = useRef<number | undefined>(undefined)
 
-  const notify = useCallback((msg: string) => {
-    setToast(msg)
+  const notify = useCallback<Store['notify']>((message, tone = 'error') => {
+    setToast({ message, tone })
     window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setToast(null), 5000)
+    // erro fica mais tempo: precisa ser lido e entendido
+    timer.current = window.setTimeout(() => setToast(null), tone === 'error' ? 7000 : 3000)
   }, [])
+  const dismissToast = useCallback(() => setToast(null), [])
 
   const reload = useCallback(async () => {
     try {
@@ -76,11 +83,12 @@ export function StoreProvider({
   }, [onSignedOut])
 
   const run = useCallback<Store['run']>(
-    async (fn, patch) => {
+    async (fn, { patch, success } = {}) => {
       if (patch) setState(patch)
       try {
         await fn()
         await reload()
+        if (success) notify(success, 'success')
         return true
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
@@ -138,9 +146,10 @@ export function StoreProvider({
       setTheme,
       toast,
       notify,
+      dismissToast,
       logout,
     }),
-    [state, month, run, form, theme, setTheme, toast, notify, logout],
+    [state, month, run, form, theme, setTheme, toast, notify, dismissToast, logout],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

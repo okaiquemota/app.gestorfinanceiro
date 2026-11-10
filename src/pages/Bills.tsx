@@ -31,32 +31,33 @@ export function Bills() {
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <Panel className="p-5">
-          <p className="text-[13px] text-muted">Falta pagar</p>
+          <p className="text-caption text-muted">Falta pagar</p>
           <Money cents={total - paid} className="mt-1" />
           {overdue.length > 0 && (
-            <p className="mt-1 text-[13px] font-semibold text-bad">
+            <p className="mt-1 text-caption font-semibold text-bad">
               {overdue.length === 1 ? '1 conta atrasada' : `${overdue.length} contas atrasadas`}
             </p>
           )}
         </Panel>
         <Panel className="p-5">
-          <p className="text-[13px] text-muted">Já pago</p>
+          <p className="text-caption text-muted">Já pago</p>
           <Money cents={paid} className="mt-1" />
-          <p className="mt-1 text-[13px] text-muted">
+          <p className="mt-1 text-caption text-muted">
             {list.filter((p) => p.paid).length} de {list.length} contas
           </p>
         </Panel>
         <Panel className="p-5">
-          <p className="text-[13px] text-muted">Total de {monthLower(month)}</p>
+          <p className="text-caption text-muted">Total de {monthLower(month)}</p>
           <Money cents={total} className="mt-1" />
         </Panel>
       </div>
 
       <Panel className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[15px] font-semibold">Contas de {monthLower(month)}</h2>
+          <h2 className="text-lead font-semibold">Contas de {monthLower(month)}</h2>
           <div className="flex items-center gap-2">
             <Segmented
+              label="Filtrar contas"
               value={filter}
               onChange={setFilter}
               options={[
@@ -94,10 +95,10 @@ export function Bills() {
               return (
                 <section key={day}>
                   <header className="flex items-baseline justify-between border-b border-line pb-1.5">
-                    <h3 className={cx('text-[13px] font-semibold', late ? 'text-bad' : 'text-muted')}>
+                    <h3 className={cx('text-caption font-semibold', late ? 'text-bad' : 'text-muted')}>
                       <span className="tnum text-fg">Dia {dd(day)}</span> · {weekday(month, day)}
                     </h3>
-                    <Amount cents={items.reduce((s, p) => s + p.amount, 0)} className="text-[13px] text-muted" />
+                    <Amount cents={items.reduce((s, p) => s + p.amount, 0)} className="text-caption text-muted" />
                   </header>
                   <ul className="divide-y divide-line">
                     {items.map((p) => (

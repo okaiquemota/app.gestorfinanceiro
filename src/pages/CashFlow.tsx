@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { addMonths, summarize } from '../../shared/finance.ts'
 import { brl, brlShort, monthLong, monthLongTitle, monthShort } from '../lib/format.ts'
 import { navigate } from '../router.tsx'
@@ -6,6 +7,18 @@ import { useStore } from '../store.tsx'
 import { Amount, Money, Panel, cx } from '../ui.tsx'
 
 const MONTHS = 12
+
+const NARROW = '(max-width: 639px)'
+const useNarrow = (): boolean => {
+  const [narrow, setNarrow] = useState(() => window.matchMedia(NARROW).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(NARROW)
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return narrow
+}
 
 /** Teto "redondo" pro eixo: 1, 2, 2,5 ou 5 × potência de 10. */
 const niceMax = (v: number): number => {
@@ -17,6 +30,9 @@ const niceMax = (v: number): number => {
 export function CashFlow() {
   const { state, month, setMonth } = useStore()
   const [hover, setHover] = useState<number | null>(null)
+  // No celular o gráfico mostra 6 meses: com 12, cada coluna ficaria estreita demais pra tocar.
+  const narrow = useNarrow()
+  const shown = narrow ? 6 : MONTHS
 
   const rows = useMemo(() => {
     let acc = 0
@@ -42,24 +58,26 @@ export function CashFlow() {
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <Panel className="p-5">
-          <p className="text-[13px] text-muted">Sobra somada em {MONTHS} meses</p>
+          <p className="text-caption text-muted">Sobra somada em {MONTHS} meses</p>
           <Money cents={total} className={cx('mt-1', total < 0 && 'text-bad')} />
         </Panel>
         <Panel className="p-5">
-          <p className="text-[13px] text-muted">Mês mais apertado</p>
+          <p className="text-caption text-muted">Mês mais apertado</p>
           <Money cents={tight.leftover} className={cx('mt-1', tight.leftover < 0 && 'text-bad')} />
-          <p className="mt-1 text-[13px] text-muted">{monthLong(tight.month)}</p>
+          <p className="mt-1 text-caption text-muted">{monthLong(tight.month)}</p>
         </Panel>
         <Panel className="p-5">
-          <p className="text-[13px] text-muted">Média de saídas por mês</p>
+          <p className="text-caption text-muted">Média de saídas por mês</p>
           <Money cents={avgOut} className="mt-1" />
         </Panel>
       </div>
 
       <Panel className="p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[15px] font-semibold">Entradas e saídas previstas</h2>
-          <ul className="flex gap-4 text-[13px] text-muted">
+          <h2 className="text-lead font-semibold">
+            Entradas e saídas previstas <span className="font-normal text-muted sm:hidden">· 6 meses</span>
+          </h2>
+          <ul className="flex gap-4 text-caption text-muted">
             <li className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-[3px]" style={{ background: 'var(--s-in)' }} /> Entradas
             </li>
@@ -70,7 +88,7 @@ export function CashFlow() {
         </div>
 
         <div className="mt-5 flex gap-2">
-          <div className="tnum flex h-56 w-14 shrink-0 flex-col justify-between text-right text-[11px] text-faint" aria-hidden>
+          <div className="tnum flex h-56 w-14 shrink-0 flex-col justify-between text-right text-micro text-faint" aria-hidden>
             {ticks.map((t) => (
               <span key={t} className="-translate-y-1/2 leading-none">
                 {brlShort(top * t)}
@@ -87,15 +105,16 @@ export function CashFlow() {
               />
             ))}
             <div className="absolute inset-0 flex">
-              {rows.map((r, i) => (
+              {rows.slice(0, shown).map((r, i) => (
                 <button
                   key={r.month}
                   type="button"
                   aria-label={`${monthLong(r.month)}: entradas ${brl(r.income)}, saídas ${brl(r.expenses)}, sobra ${brl(r.leftover)}`}
+                  aria-pressed={hover === i}
                   onMouseEnter={() => setHover(i)}
                   onFocus={() => setHover(i)}
-                  onBlur={() => setHover(null)}
-                  onClick={() => open(r.month)}
+                  // toque: mostra o detalhe do mês (pra abrir o mês, use a tabela abaixo)
+                  onClick={() => setHover(i)}
                   className={cx(
                     'relative flex h-full flex-1 items-end justify-center gap-[2px] rounded-t-md px-[2px]',
                     hover === i && 'bg-sunken',
@@ -112,11 +131,11 @@ export function CashFlow() {
                 </button>
               ))}
             </div>
-            {hover !== null && (
+            {hover !== null && hover < shown && (
               <div
                 role="status"
-                className="pointer-events-none absolute top-0 z-10 w-48 -translate-x-1/2 rounded-xl border border-line bg-surface p-3 text-[13px] shadow-pop"
-                style={{ left: `clamp(96px, ${((hover + 0.5) / MONTHS) * 100}%, calc(100% - 96px))` }}
+                className="pointer-events-none absolute top-0 z-10 w-48 -translate-x-1/2 rounded-xl border border-line bg-surface p-3 text-caption shadow-pop"
+                style={{ left: `clamp(96px, ${((hover + 0.5) / shown) * 100}%, calc(100% - 96px))` }}
               >
                 <p className="font-semibold">{monthLongTitle(rows[hover].month)}</p>
                 <p className="mt-1.5 flex justify-between gap-3 text-muted">
@@ -135,8 +154,8 @@ export function CashFlow() {
         <div className="mt-1.5 flex gap-2" aria-hidden>
           <div className="w-14 shrink-0" />
           <div className="flex min-w-0 flex-1">
-            {rows.map((r, i) => (
-              <span key={r.month} className={cx('flex-1 truncate text-center text-[11px]', i === 0 ? 'font-semibold text-fg' : 'text-faint')}>
+            {rows.slice(0, shown).map((r, i) => (
+              <span key={r.month} className={cx('flex-1 truncate text-center text-micro', i === 0 ? 'font-semibold text-fg' : 'text-faint')}>
                 {monthShort(r.month)}
               </span>
             ))}
@@ -145,38 +164,45 @@ export function CashFlow() {
       </Panel>
 
       <Panel className="overflow-hidden">
-        <h2 className="px-5 pt-5 text-[15px] font-semibold sm:px-6">Mês a mês</h2>
+        <h2 className="px-5 pt-5 text-lead font-semibold sm:px-6">Mês a mês</h2>
+        <p className="px-5 text-caption text-muted sm:px-6">Toque no mês pra abrir ele na visão geral.</p>
         <div className="mt-3 overflow-x-auto">
-          <table className="tnum w-full min-w-[680px] text-right text-[13px]">
+          <table className="tnum w-full whitespace-nowrap text-right text-caption md:min-w-[680px]">
             <thead>
               <tr className="border-b border-line text-xs text-muted">
                 <th className="px-5 py-2 text-left font-semibold sm:px-6">Mês</th>
-                <th className="px-3 py-2 font-semibold">Renda</th>
-                <th className="px-3 py-2 font-semibold">Contas</th>
-                <th className="px-3 py-2 font-semibold">Cartões</th>
-                <th className="px-3 py-2 font-semibold">Dia a dia</th>
-                <th className="px-3 py-2 font-semibold">Sobra</th>
-                <th className="px-5 py-2 font-semibold sm:px-6">Acumulado</th>
+                <th className="px-2 py-2 font-semibold sm:px-3">Renda</th>
+                <th className="px-2 py-2 font-semibold sm:px-3 md:hidden">Saídas</th>
+                <th className="px-2 py-2 font-semibold sm:px-3 max-md:hidden">Contas</th>
+                <th className="px-2 py-2 font-semibold sm:px-3 max-md:hidden">Cartões</th>
+                <th className="px-2 py-2 font-semibold sm:px-3 max-md:hidden">Dia a dia</th>
+                <th className="px-2 py-2 font-semibold max-sm:pr-5 sm:px-3">Sobra</th>
+                <th className="px-5 py-2 font-semibold max-sm:hidden sm:px-6">Acumulado</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr
-                  key={r.month}
-                  onClick={() => open(r.month)}
-                  className="cursor-pointer border-b border-line last:border-0 hover:bg-sunken"
-                >
-                  <th scope="row" className="px-5 py-2.5 text-left font-semibold sm:px-6">
-                    {monthShort(r.month)}
+                <tr key={r.month} className="border-b border-line last:border-0 hover:bg-sunken">
+                  <th scope="row" className="py-1 pl-3 pr-0 text-left font-semibold sm:px-4">
+                    <button
+                      type="button"
+                      onClick={() => open(r.month)}
+                      aria-label={`Abrir ${monthLong(r.month)} na visão geral`}
+                      className="flex h-9 items-center gap-1 rounded-lg px-2 text-accent hover:bg-primary-soft"
+                    >
+                      {monthShort(r.month)}
+                      <ChevronRight size={14} />
+                    </button>
                   </th>
-                  <td className="px-3 py-2.5">{brl(r.income)}</td>
-                  <td className="px-3 py-2.5 text-muted">{brl(r.housing + r.bills + r.savings)}</td>
-                  <td className="px-3 py-2.5 text-muted">{brl(r.cards)}</td>
-                  <td className="px-3 py-2.5 text-muted">{brl(r.daily)}</td>
-                  <td className={cx('px-3 py-2.5 font-semibold', r.leftover < 0 ? 'text-bad' : 'text-good')}>
+                  <td className="px-2 py-2.5 sm:px-3">{brl(r.income)}</td>
+                  <td className="px-2 py-2.5 sm:px-3 text-muted md:hidden">{brl(r.expenses)}</td>
+                  <td className="px-2 py-2.5 sm:px-3 text-muted max-md:hidden">{brl(r.housing + r.bills + r.savings)}</td>
+                  <td className="px-2 py-2.5 sm:px-3 text-muted max-md:hidden">{brl(r.cards)}</td>
+                  <td className="px-2 py-2.5 sm:px-3 text-muted max-md:hidden">{brl(r.daily)}</td>
+                  <td className={cx('px-2 py-2.5 font-semibold max-sm:pr-5 sm:px-3', r.leftover < 0 ? 'text-bad' : 'text-good')}>
                     {brl(r.leftover)}
                   </td>
-                  <td className={cx('px-5 py-2.5 font-semibold sm:px-6', r.acc < 0 && 'text-bad')}>{brl(r.acc)}</td>
+                  <td className={cx('px-5 py-2.5 font-semibold max-sm:hidden sm:px-6', r.acc < 0 && 'text-bad')}>{brl(r.acc)}</td>
                 </tr>
               ))}
             </tbody>

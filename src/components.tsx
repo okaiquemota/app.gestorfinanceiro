@@ -36,18 +36,22 @@ export const usePayableActions = () => {
     if (p.type === 'entry')
       return run(
         () => api('PUT', `/entries/${p.id}/months/${p.month}`, { paid }),
-        (s: AppState) => {
-          const cur = s.entryMonths.find((r) => r.entry_id === p.id && r.month === p.month)
-          const row = { entry_id: p.id, month: p.month, amount_cents: null, skipped: false, ...cur, paid_at: paidAt }
-          return { ...s, entryMonths: [...s.entryMonths.filter((r) => r !== cur), row] }
+        {
+          patch: (s: AppState) => {
+            const cur = s.entryMonths.find((r) => r.entry_id === p.id && r.month === p.month)
+            const row = { entry_id: p.id, month: p.month, amount_cents: null, skipped: false, ...cur, paid_at: paidAt }
+            return { ...s, entryMonths: [...s.entryMonths.filter((r) => r !== cur), row] }
+          },
         },
       )
     return run(
       () => api('PUT', `/cards/${p.id}/invoices/${p.month}`, { paid }),
-      (s: AppState) => {
-        const cur = s.invoices.find((r) => r.card_id === p.id && r.month === p.month)
-        const row = { card_id: p.id, month: p.month, amount_cents: null, ...cur, paid_at: paidAt }
-        return { ...s, invoices: [...s.invoices.filter((r) => r !== cur), row] }
+      {
+        patch: (s: AppState) => {
+          const cur = s.invoices.find((r) => r.card_id === p.id && r.month === p.month)
+          const row = { card_id: p.id, month: p.month, amount_cents: null, ...cur, paid_at: paidAt }
+          return { ...s, invoices: [...s.invoices.filter((r) => r !== cur), row] }
+        },
       },
     )
   }
@@ -67,7 +71,7 @@ export function PayableRow({ p, detailed }: { p: Payable; detailed?: boolean }) 
   const status = dueStatus(p)
   const cat = category(p.category)
   return (
-    <li className="flex items-center gap-3 py-2.5">
+    <li className="flex items-center gap-3">
       <CheckCircle
         checked={p.paid}
         onChange={(v) => setPaid(p, v)}
@@ -76,11 +80,14 @@ export function PayableRow({ p, detailed }: { p: Payable; detailed?: boolean }) 
       <button
         type="button"
         onClick={() => open(p)}
-        className="group flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left"
+        className="group flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg py-2 text-left"
       >
-        {detailed && <Emoji name={cat.emoji} size={30} className={p.paid ? 'opacity-50' : undefined} />}
+        {/* em telas muito estreitas o nome da conta vale mais que o ícone */}
+        {detailed && <Emoji name={cat.emoji} size={30} className={cx('max-[359px]:hidden', p.paid && 'opacity-50')} />}
         <span className="min-w-0 flex-1">
-          <span className={cx('block truncate font-medium', p.paid && 'text-faint line-through')}>{p.name}</span>
+          <span className={cx('block truncate font-medium group-hover:text-accent', p.paid && 'text-faint line-through')}>
+            {p.name}
+          </span>
           {detailed && (
             <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted">
               {cat.label}
@@ -95,7 +102,7 @@ export function PayableRow({ p, detailed }: { p: Payable; detailed?: boolean }) 
           )}
         </span>
         <Amount cents={p.amount} approx={p.estimated && !p.paid} className={p.paid ? 'text-faint' : undefined} />
-        {detailed && <ChevronRight size={16} className="text-faint group-hover:text-fg" />}
+        {detailed && <ChevronRight size={16} className="text-faint group-hover:text-fg max-[359px]:hidden" />}
       </button>
     </li>
   )
@@ -137,7 +144,7 @@ export function CardVisual({
         className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_40%,rgb(255_255_255/0.10)_50%,transparent_60%)]"
       />
       <span className="relative flex items-start justify-between gap-2">
-        <span className="truncate text-[15px] font-semibold">{card.name}</span>
+        <span className="truncate text-lead font-semibold">{card.name}</span>
         <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">{status}</span>
       </span>
       <span className="relative flex items-center justify-between">
@@ -210,7 +217,7 @@ export function PanelHeader({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+        <h2 className="flex items-center gap-2 text-lead font-semibold">
           {title}
           {aside}
         </h2>
