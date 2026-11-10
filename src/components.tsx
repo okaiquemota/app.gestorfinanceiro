@@ -7,7 +7,7 @@ import type { InvoiceView, Payable } from '../shared/finance.ts'
 import type { AppState, Card } from '../shared/types.ts'
 import { api } from './lib/api.ts'
 import { CARD_COLORS, category } from './lib/categories.ts'
-import { brl, dayMonth } from './lib/format.ts'
+import { brl, brlRound, dayMonth } from './lib/format.ts'
 import { useStore } from './store.tsx'
 import { Amount, Badge, CheckCircle, Emoji, cx } from './ui.tsx'
 
@@ -116,12 +116,15 @@ export function CardVisual({
   selected,
   onClick,
   className,
+  compact,
 }: {
   card: Card
   invoice: InvoiceView
   selected?: boolean
   onClick?: () => void
   className?: string
+  /** Versão menor, que ocupa a largura da coluna: vários cartões lado a lado sem cortar nenhum. */
+  compact?: boolean
 }) {
   const { state } = useStore()
   const free = card.limit_cents - cardCommitted(state, card, invoice.month)
@@ -133,7 +136,8 @@ export function CardVisual({
       aria-pressed={selected}
       style={{ background: (CARD_COLORS[card.color] ?? CARD_COLORS.graphite).bg }}
       className={cx(
-        'relative flex aspect-[1.6] w-[270px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-2xl p-4 text-left text-white shadow-card ring-offset-2 ring-offset-surface transition-shadow',
+        'relative flex aspect-[1.6] flex-col justify-between overflow-hidden rounded-2xl text-left text-white shadow-card ring-offset-2 ring-offset-surface transition-shadow',
+        compact ? 'w-full min-w-0 p-3' : 'w-[270px] shrink-0 snap-start p-4',
         selected && 'ring-2 ring-primary',
         className,
       )}
@@ -144,27 +148,30 @@ export function CardVisual({
         className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_40%,rgb(255_255_255/0.10)_50%,transparent_60%)]"
       />
       <span className="relative flex items-start justify-between gap-2">
-        <span className="truncate text-lead font-semibold">{card.name}</span>
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">{status}</span>
+        <span className={cx('truncate font-semibold', compact ? 'text-caption' : 'text-lead')}>{card.name}</span>
+        <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold backdrop-blur">{status}</span>
       </span>
       <span className="relative flex items-center justify-between">
-        <span aria-hidden className="grid h-7 w-9 grid-cols-3 gap-px overflow-hidden rounded-md bg-black/20 p-px">
+        <span
+          aria-hidden
+          className={cx('grid grid-cols-3 gap-px overflow-hidden rounded-md bg-black/20 p-px', compact ? 'h-5 w-7' : 'h-7 w-9')}
+        >
           {Array.from({ length: 6 }, (_, i) => (
             <span key={i} className="bg-white/80" />
           ))}
         </span>
-        {card.last4 && <span className="tnum text-xs tracking-[0.2em] text-white/80">•••• {card.last4}</span>}
-        <Wifi aria-hidden size={18} className="rotate-90 text-white/70" />
+        {card.last4 && !compact && <span className="tnum text-xs tracking-[0.2em] text-white/80">•••• {card.last4}</span>}
+        <Wifi aria-hidden size={compact ? 14 : 18} className="rotate-90 text-white/70" />
       </span>
       <span className="relative flex items-end justify-between gap-2">
         <span>
           <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/60">VENCE</span>
-          <span className="tnum text-sm font-semibold">{dayMonth(invoice.month, invoice.day)}</span>
+          <span className={cx('tnum font-semibold', compact ? 'text-xs' : 'text-sm')}>{dayMonth(invoice.month, invoice.day)}</span>
         </span>
         {card.limit_cents > 0 && (
           <span className="text-right">
-            <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/60">LIMITE LIVRE</span>
-            <span className="tnum text-sm font-semibold">{brl(free)}</span>
+            <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/60">{compact ? 'LIVRE' : 'LIMITE LIVRE'}</span>
+            <span className={cx('tnum font-semibold', compact ? 'text-xs' : 'text-sm')}>{compact ? brlRound(free) : brl(free)}</span>
           </span>
         )}
       </span>

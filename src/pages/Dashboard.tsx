@@ -477,18 +477,24 @@ function CardsCard({ sum }: { sum: Summary }) {
         </div>
       ) : (
         <>
-          <div className="no-scrollbar -mx-5 mt-4 flex shrink-0 snap-x gap-3 overflow-x-auto px-5 py-1 sm:-mx-6 sm:px-6">
+          {/* todos os cartões inteiros, lado a lado: nada cortado na borda nem escondido atrás de rolagem */}
+          <div
+            className={cx(
+              'mt-4 grid shrink-0 gap-3',
+              invoices.length === 1 ? 'grid-cols-1' : invoices.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3',
+            )}
+          >
             {invoices.map((inv) => (
               <CardVisual
                 key={inv.card.id}
                 card={inv.card}
                 invoice={inv}
+                compact={invoices.length > 1}
                 onClick={() => openForm({ type: 'invoice', cardId: inv.card.id, month })}
               />
             ))}
           </div>
 
-          {/* em janelas baixas ficam só os cartões; as próximas faturas estão na tela de Cartões */}
           <h3 className="mt-5 text-micro font-semibold tracking-[0.06em] text-faint fit:mt-4 tight:hidden">PRÓXIMAS FATURAS</h3>
           <ol className="mt-2 grid grid-cols-3 gap-2 tight:hidden">
             {upcoming.map((u, i) => (
@@ -517,7 +523,7 @@ function CardsCard({ sum }: { sum: Summary }) {
           </ol>
           <Link
             href="/cartoes"
-            className="mt-3 flex items-center justify-center fit:mt-2 tight:hidden gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft"
+            className="mt-3 flex items-center justify-center fit:mt-2 gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft"
           >
             Ver compras e parcelas <ChevronRight size={14} />
           </Link>
