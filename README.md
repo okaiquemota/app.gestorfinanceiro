@@ -41,14 +41,16 @@ npm run typecheck
 
 ## Publicando no Cloudflare
 
-O `database_id` do D1 fica em `wrangler.jsonc`.
+No ar em https://gestor-financeiro.okaiquemota.workers.dev. O `database_id` do D1 fica em `wrangler.jsonc`.
 
 ```bash
-npm run db:migrate:remote
+npm run db:migrate:remote   # só quando houver migração nova
 npm run deploy
 ```
 
-Opcional: definir o segredo `SETUP_CODE` (`npx wrangler secret put SETUP_CODE`) faz a criação da conta exigir esse código — evita que outra pessoa crie a conta antes de você no primeiro acesso.
+`npm run deploy:embedded` é o plano B: publica o front embutido dentro do próprio Worker, sem a etapa de upload de arquivos estáticos. Serve para ambientes onde esse upload falha com 401 (proxy que reescreve o cabeçalho `Authorization`). O resultado para quem usa é o mesmo.
+
+O segredo `SETUP_CODE` faz a criação da conta exigir um código — evita que outra pessoa crie a conta antes do dono no primeiro acesso. Depois que a conta existe, novos cadastros são recusados de qualquer forma. Para trocar: `npx wrangler secret put SETUP_CODE`.
 
 ## Créditos
 
