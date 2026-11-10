@@ -240,8 +240,9 @@ export function Badge({ tone = 'neutral', children }: { tone?: 'neutral' | 'good
 
 // ---------- formulários ----------
 
+// 16px no texto: abaixo disso o Safari do iPhone dá zoom na página ao focar o campo.
 const INPUT =
-  'h-11 w-full rounded-xl border border-line-strong bg-surface px-3 text-[15px] text-fg placeholder:text-faint focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
+  'h-11 w-full min-w-0 rounded-xl border border-line-strong bg-surface px-3 text-base text-fg placeholder:text-faint focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20'
 
 /**
  * Rótulo + controle. Com `group`, o conteúdo tem vários controles (botões de
@@ -462,21 +463,21 @@ export function Modal({
       }}
     >
       <form
-        className="flex min-h-0 flex-1 flex-col"
+        className="sheet-form"
         onSubmit={(e) => {
           e.preventDefault()
           onSubmit?.()
         }}
       >
-        <header className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
+        <header className="flex shrink-0 items-center justify-between gap-3 px-5 pb-1 pt-4">
           <h2 className="text-lg font-semibold tracking-[-0.01em]">{title}</h2>
           <IconButton label="Fechar" onClick={onClose} className="-mr-2">
             <X size={18} />
           </IconButton>
         </header>
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">{children}</div>
+        <div className="sheet-body space-y-4 px-5 py-4">{children}</div>
         {footer && (
-          <footer className="flex items-center gap-2 border-t border-line px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
+          <footer className="flex shrink-0 items-center gap-2 border-t border-line px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))]">
             {footer}
           </footer>
         )}

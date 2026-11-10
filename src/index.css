@@ -128,11 +128,17 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
-/* <dialog> como modal no desktop e como folha de baixo no celular */
+/*
+ * <dialog> como modal no desktop e como folha de baixo no celular.
+ * A altura máxima fica no <form> interno (.sheet-form), que é o único flex:
+ * cabeçalho e rodapé fixos, miolo que encolhe e rola. Nada aqui depende de
+ * `flex: 1` com base 0%, que no Safari zera a altura do conteúdo quando o
+ * contêiner tem altura automática (o modal abria "vazio" no iPhone).
+ */
 dialog.sheet {
   margin: auto;
   width: min(460px, calc(100vw - 32px));
-  max-height: min(88dvh, 760px);
+  max-height: none;
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 20px;
@@ -142,25 +148,40 @@ dialog.sheet {
   overflow: hidden;
 }
 dialog.sheet[open] {
-  display: flex;
-  flex-direction: column;
+  display: block;
   animation: pop 0.16s ease-out;
 }
 dialog.sheet::backdrop {
   background: rgb(10 12 16 / 0.45);
+  -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
+}
+.sheet-form {
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 760px);
+  max-height: min(88dvh, 760px);
+}
+.sheet-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 @media (max-width: 640px) {
   dialog.sheet {
     margin: auto 0 0;
-    width: 100vw;
-    max-width: 100vw;
-    max-height: 92dvh;
+    width: 100%;
+    max-width: 100%;
     border-radius: 22px 22px 0 0;
     border-width: 1px 0 0;
   }
   dialog.sheet[open] {
     animation: rise 0.2s ease-out;
+  }
+  .sheet-form {
+    max-height: 90vh;
+    max-height: 92dvh;
   }
 }
 @keyframes pop {

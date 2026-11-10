@@ -97,7 +97,7 @@ export function CashFlow() {
                   onBlur={() => setHover(null)}
                   onClick={() => open(r.month)}
                   className={cx(
-                    'relative flex flex-1 items-end justify-center gap-[2px] rounded-t-md px-[2px]',
+                    'relative flex h-full flex-1 items-end justify-center gap-[2px] rounded-t-md px-[2px]',
                     hover === i && 'bg-sunken',
                   )}
                 >

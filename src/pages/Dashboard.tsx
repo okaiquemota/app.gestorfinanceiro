@@ -432,17 +432,17 @@ function CardsCard({ sum }: { sum: Summary }) {
           </div>
 
           <h3 className="mt-5 text-[11px] font-semibold tracking-[0.06em] text-faint">PRÓXIMAS FATURAS</h3>
-          <ol className="mt-2 grid flex-1 grid-cols-3 gap-2">
+          <ol className="mt-2 grid grid-cols-3 gap-2">
             {upcoming.map((u, i) => (
               <li
                 key={u.month}
                 className={cx(
-                  'flex min-h-[132px] flex-col rounded-xl border p-2.5 text-center',
+                  'flex flex-col rounded-xl border p-2.5 text-center',
                   i === 0 ? 'border-primary bg-primary-soft' : 'border-transparent bg-sunken',
                 )}
               >
                 <span className="text-[13px] font-semibold">{monthShort(u.month)}</span>
-                <span className="mt-2 flex flex-1 items-end justify-center" aria-hidden>
+                <span className="mt-2 flex h-14 items-end justify-center" aria-hidden>
                   <span
                     className="w-7 rounded-t-[4px]"
                     style={{
