@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, Check, ChevronRight, Pencil, TriangleAlert } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowDownRight, ArrowUpRight, Check, ChevronLeft, ChevronRight, Pencil, TriangleAlert } from 'lucide-react'
 import {
   HOUSING,
   addMonths,
@@ -13,10 +13,10 @@ import {
 import type { Payable, Summary } from '../../shared/finance.ts'
 import { CardVisual, Meter, PanelHeader, PayableRow, daysUntil, dueStatus } from '../components.tsx'
 import { category } from '../lib/categories.ts'
-import { brl, brlRound, dd, monthLower, monthShort, pct } from '../lib/format.ts'
+import { brl, dd, monthLower, monthShort, pct } from '../lib/format.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
-import { Amount, Button, Emoji, Money, Panel, Segmented, cx } from '../ui.tsx'
+import { Amount, Badge, Button, Emoji, Money, Panel, Segmented, cx } from '../ui.tsx'
 
 export function Dashboard() {
   const { state, month } = useStore()
@@ -38,7 +38,7 @@ export function Dashboard() {
           </div>
           <div className={cx('order-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
             <BreakdownCard sum={sum} />
-            <CardsCard sum={sum} />
+            <CardsCard />
           </div>
           {!onboarding && (
             <div className="hidden shrink-0 fit:block">
@@ -444,31 +444,48 @@ function BreakdownCard({ sum }: { sum: Summary }) {
 
 // ---------- cartões ----------
 
-function CardsCard({ sum }: { sum: Summary }) {
+function CardsCard() {
   const { state, month, openForm } = useStore()
   const invoices = useMemo(() => state.cards.map((c) => invoiceFor(state, c, month)), [state, month])
+
+  // Carrossel: um cartão em foco por vez, com o próximo aparecendo na borda.
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  const index = Math.max(0, invoices.findIndex((i) => i.card.id === pickedId))
+  const current = invoices[index]
+  const strip = useRef<HTMLDivElement>(null)
+  const go = (i: number) => {
+    const next = invoices[i]
+    if (!next) return
+    setPickedId(next.card.id)
+    const el = strip.current?.children[i] as HTMLElement | undefined
+    // rola só a fileira (scrollIntoView mexeria também na página)
+    if (el && strip.current) strip.current.scrollTo({ left: el.offsetLeft - strip.current.offsetLeft, behavior: 'smooth' })
+  }
+
   const upcoming = useMemo(
     () =>
-      [0, 1, 2].map((i) => {
-        const m = addMonths(month, i)
-        return { month: m, total: state.cards.reduce((s, c) => s + invoiceFor(state, c, m).amount, 0) }
-      }),
-    [state, month],
+      current
+        ? [0, 1, 2].map((i) => invoiceFor(state, current.card, addMonths(month, i)))
+        : [],
+    [state, month, current],
   )
-  const max = Math.max(1, ...upcoming.map((u) => u.total))
+  const max = Math.max(1, ...upcoming.map((u) => u.amount))
+  // altura do ponto de cada mês dentro da faixa do gráfico (10% a 90%)
+  const y = (amount: number) => 90 - (amount / max) * 80
 
   return (
     <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
       <PanelHeader title="Cartões" emoji="card">
         <p className="mt-3 text-caption text-muted">
-          {state.cards.length > 1 ? 'Faturas' : 'Fatura'} de {monthLower(month)}
+          Fatura de {monthLower(month)}
+          {current && invoices.length > 1 && <> · {current.card.name}</>}
         </p>
         <div className="mt-1">
-          <Money cents={sum.cards} />
+          <Money cents={current?.amount ?? 0} />
         </div>
       </PanelHeader>
 
-      {state.cards.length === 0 ? (
+      {!current ? (
         <div className="mt-5 rounded-2xl bg-sunken px-4 py-6 text-center">
           <p className="text-muted">Cadastre um cartão pra acompanhar faturas e parcelas.</p>
           <Button variant="primary" size="sm" className="mt-3" onClick={() => openForm({ type: 'card' })}>
@@ -477,53 +494,98 @@ function CardsCard({ sum }: { sum: Summary }) {
         </div>
       ) : (
         <>
-          {/* todos os cartões inteiros, lado a lado: nada cortado na borda nem escondido atrás de rolagem */}
-          <div
-            className={cx(
-              'mt-4 grid shrink-0 gap-3',
-              invoices.length === 1 ? 'grid-cols-1' : invoices.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3',
+          <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
+            <Button size="sm" onClick={() => openForm({ type: 'invoice', cardId: current.card.id, month })}>
+              Ver fatura
+            </Button>
+            {invoices.length > 1 && (
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Cartão anterior"
+                  disabled={index === 0}
+                  onClick={() => go(index - 1)}
+                  className="flex size-9 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-sunken disabled:cursor-not-allowed disabled:text-faint disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Próximo cartão"
+                  disabled={index === invoices.length - 1}
+                  onClick={() => go(index + 1)}
+                  className="flex size-9 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-sunken disabled:cursor-not-allowed disabled:text-faint disabled:opacity-50"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             )}
+          </div>
+
+          {/* a fileira sangra até a borda direita do painel: o próximo cartão aparece pela metade, como convite */}
+          <div
+            ref={strip}
+            className="no-scrollbar -mr-5 mt-3 flex shrink-0 gap-3 overflow-x-auto py-1 pr-5 sm:-mr-6 sm:pr-6"
           >
-            {invoices.map((inv) => (
+            {invoices.map((inv, i) => (
               <CardVisual
                 key={inv.card.id}
                 card={inv.card}
                 invoice={inv}
-                compact={invoices.length > 1}
-                onClick={() => openForm({ type: 'invoice', cardId: inv.card.id, month })}
+                className="!w-[min(320px,82%)] fit:!w-[min(272px,74%)]"
+                onClick={() => (i === index ? openForm({ type: 'invoice', cardId: inv.card.id, month }) : go(i))}
               />
             ))}
           </div>
 
           <h3 className="mt-5 text-micro font-semibold tracking-[0.06em] text-faint fit:mt-4 tight:hidden">PRÓXIMAS FATURAS</h3>
-          <ol className="mt-2 grid grid-cols-3 gap-2 tight:hidden">
-            {upcoming.map((u, i) => (
-              <li
-                key={u.month}
-                className={cx(
-                  'flex flex-col rounded-xl border p-2.5 text-center',
-                  i === 0 ? 'border-primary bg-primary-soft' : 'border-transparent bg-sunken',
-                )}
-              >
-                <span className="text-caption font-semibold">{monthShort(u.month)}</span>
-                <span className="mt-2 flex h-14 items-end justify-center fit:h-9" aria-hidden>
-                  <span
-                    className="w-7 rounded-t-[4px]"
-                    style={{
-                      height: `${Math.max(4, (u.total / max) * 100)}%`,
-                      background: i === 0 ? 'var(--primary)' : 'var(--line-strong)',
-                    }}
-                  />
-                </span>
-                <span className={cx('tnum mt-2 text-caption font-semibold', i === 0 ? 'text-accent' : 'text-muted')}>
-                  {brlRound(u.total)}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <div className="relative mt-2 tight:hidden">
+            <ol className="grid grid-cols-3 gap-2">
+              {upcoming.map((u, i) => (
+                <li
+                  key={u.month}
+                  className={cx(
+                    'flex h-[132px] flex-col items-center justify-between rounded-xl border p-2.5 text-center fit:h-[116px]',
+                    i === 0 ? 'border-primary bg-linear-to-b from-surface from-45% to-primary-soft' : 'border-transparent bg-sunken',
+                  )}
+                >
+                  <span>
+                    <span className="block text-caption font-semibold">{monthShort(u.month)}</span>
+                    {i === 0 && u.amount > 0 && <Badge tone={u.paid ? 'good' : 'primary'}>{u.paid ? 'Paga' : 'Aberta'}</Badge>}
+                  </span>
+                  <span className={cx('tnum text-caption font-semibold', i === 0 ? 'text-accent' : 'text-muted')}>
+                    {brl(u.amount)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {/* linha ligando os três meses: sobe e desce com o valor da fatura */}
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-9 top-[58px]">
+              <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="size-full overflow-visible">
+                <polyline
+                  points={[...upcoming.map((u, i) => `${50 + i * 100},${y(u.amount)}`), `300,${y(upcoming[2].amount)}`].join(' ')}
+                  fill="none"
+                  stroke="var(--control)"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              {upcoming.map((u, i) => (
+                <span
+                  key={u.month}
+                  className={cx(
+                    'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-surface',
+                    i === 0 ? 'border-primary' : 'border-control',
+                  )}
+                  style={{ left: `${((i + 0.5) / 3) * 100}%`, top: `${y(u.amount)}%` }}
+                />
+              ))}
+            </div>
+          </div>
           <Link
             href="/cartoes"
-            className="mt-3 flex items-center justify-center fit:mt-2 gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft"
+            className="mt-3 flex items-center justify-center gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft fit:hidden"
           >
             Ver compras e parcelas <ChevronRight size={14} />
           </Link>
