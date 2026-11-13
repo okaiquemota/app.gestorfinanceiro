@@ -1,6 +1,6 @@
-# Gestor financeiro
+# Poupin
 
-Painel pessoal pra enxergar o mês inteiro de uma vez: quanto entra, o que vence, quanto vai pro cartão e quanto sobra.
+Gestor financeiro pessoal pra enxergar o mês inteiro de uma vez: quanto entra, o que vence, quanto vai pro cartão e quanto sobra.
 
 ## O que tem
 
@@ -54,6 +54,6 @@ O segredo `SETUP_CODE` faz a criação da conta exigir um código — evita que 
 
 ## Créditos
 
-Mascote (porquinho-cofre roxo, seis poses): imagens geradas por IA no Figma, em `public/emoji/mascote*.webp`.
+Poupin, o mascote (porquinho-cofre roxo, seis poses): imagens geradas por IA no Figma, em `public/emoji/mascote*.webp`.
 
 Ícones 3D: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) da Microsoft (licença MIT).

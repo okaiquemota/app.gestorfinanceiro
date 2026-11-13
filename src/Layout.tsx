@@ -95,7 +95,7 @@ function Sidebar({ path }: { path: string }) {
       <Link href="/" className="flex items-center gap-2.5 px-2 pb-4 pt-2">
         <Emoji name="mascote" size={40} />
         <span>
-          <span className="block text-lead font-semibold leading-tight">Gestor</span>
+          <span className="block text-lead font-semibold leading-tight">Poupin</span>
           <span className="block text-xs text-muted">Minhas finanças</span>
         </span>
       </Link>
@@ -370,7 +370,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const shownPath = useRef(path)
 
   useEffect(() => {
-    document.title = `${page} · Gestor financeiro`
+    document.title = `${page} · Poupin`
     // ao trocar de tela (não na primeira carga), o foco vai pro conteúdo:
     // teclado e leitor de tela não ficam presos no menu
     if (shownPath.current !== path) {

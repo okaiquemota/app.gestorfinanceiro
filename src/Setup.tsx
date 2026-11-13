@@ -159,7 +159,7 @@ export function SetupWizard() {
     body = (
       <div className="text-center">
         <Emoji name="mascote-oi" size={104} className="mx-auto" />
-        <h3 className="mt-3 text-xl font-semibold tracking-[-0.01em]">Oi, {firstName}. Vamos deixar tudo pronto?</h3>
+        <h3 className="mt-3 text-xl font-semibold tracking-[-0.01em]">Oi, {firstName}! Eu sou o Poupin. Vamos deixar tudo pronto?</h3>
         <p className="mx-auto mt-1 max-w-xs text-muted">
           São 4 passos rápidos. Dá pra pular qualquer um e completar depois.
         </p>

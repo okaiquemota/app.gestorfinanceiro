@@ -32,10 +32,10 @@ export function Auth({ status, onDone }: { status: AuthStatus; onDone: () => voi
         <div className="flex flex-col items-center text-center">
           <Emoji name="mascote" size={104} className="drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />
           <h1 className="mt-4 text-2xl font-semibold tracking-[-0.02em]">
-            {setup ? 'Criar seu gestor financeiro' : 'Gestor financeiro'}
+            {setup ? 'Bem-vindo ao Poupin' : 'Poupin'}
           </h1>
           <p className="mt-1 text-muted">
-            {setup ? 'Primeiro acesso: crie a conta que vai ser a dona deste gestor.' : 'Entre pra ver suas contas.'}
+            {setup ? 'Primeiro acesso: crie a conta que vai ser a dona deste Poupin.' : 'Entre pra ver suas contas.'}
           </p>
         </div>
         <form

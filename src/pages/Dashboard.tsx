@@ -65,12 +65,12 @@ const SCROLL = 'scroll-thin fit:h-full fit:overflow-y-auto'
 /** O mascote reage ao mês, em vez de repetir o logo do menu. */
 const mascotFor = (sum: Summary, allPaid: boolean): { pose: string; alt: string } =>
   sum.income === 0 && sum.expenses === 0
-    ? { pose: 'mascote-dormindo', alt: 'Mascote dormindo: ainda não há nada cadastrado neste mês' }
+    ? { pose: 'mascote-dormindo', alt: 'Poupin dormindo: ainda não há nada cadastrado neste mês' }
     : sum.leftover < 0
-      ? { pose: 'mascote-preocupado', alt: 'Mascote preocupado: as saídas passam da renda' }
+      ? { pose: 'mascote-preocupado', alt: 'Poupin preocupado: as saídas passam da renda' }
       : allPaid
-        ? { pose: 'mascote-festa', alt: 'Mascote comemorando: todas as contas do mês estão pagas' }
-        : { pose: 'mascote-moeda', alt: 'Mascote abraçando uma moeda: está sobrando dinheiro no mês' }
+        ? { pose: 'mascote-festa', alt: 'Poupin comemorando: todas as contas do mês estão pagas' }
+        : { pose: 'mascote-moeda', alt: 'Poupin abraçando uma moeda: está sobrando dinheiro no mês' }
 
 function BalanceCard({ sum, allPaid }: { sum: Summary; allPaid: boolean }) {
   const mascot = mascotFor(sum, allPaid)
