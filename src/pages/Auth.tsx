@@ -27,7 +27,7 @@ export function Auth({ status, onDone }: { status: AuthStatus; onDone: () => voi
   }
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-10">
+    <main className="flex min-h-(--app-vh) items-center justify-center px-4 py-10">
       <div className="w-full max-w-[400px]">
         <div className="flex flex-col items-center text-center">
           <Emoji name="mascote" size={104} className="drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />

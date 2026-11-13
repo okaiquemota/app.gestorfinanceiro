@@ -80,7 +80,7 @@ export function PayableRow({ p, detailed }: { p: Payable; detailed?: boolean }) 
       <button
         type="button"
         onClick={() => open(p)}
-        className="group flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg py-2 text-left"
+        className="group flex min-h-12 min-w-0 flex-1 tight:min-h-10 tight:py-1.5 items-center gap-3 rounded-lg py-2 text-left"
       >
         {/* em telas muito estreitas o nome da conta vale mais que o ícone */}
         {detailed && <Emoji name={cat.emoji} size={30} className={cx('max-[359px]:hidden', p.paid && 'opacity-50')} />}

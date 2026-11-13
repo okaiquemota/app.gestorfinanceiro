@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ArrowDownRight, ArrowUpRight, Check, ChevronLeft, ChevronRight, Pencil, TriangleAlert } from 'lucide-react'
 import {
   HOUSING,
@@ -14,6 +14,7 @@ import type { Payable, Summary } from '../../shared/finance.ts'
 import { CardVisual, Meter, PanelHeader, PayableRow, daysUntil, dueStatus } from '../components.tsx'
 import { category } from '../lib/categories.ts'
 import { brl, dd, monthLower, monthShort, pct } from '../lib/format.ts'
+import { useLayoutMode } from '../lib/scale.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
 import { Amount, Badge, Button, Emoji, Money, Panel, Segmented, cx } from '../ui.tsx'
@@ -25,7 +26,7 @@ export function Dashboard() {
 
   return (
     // Em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
-    <div className="space-y-4 fit:flex fit:h-[calc(100dvh-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0">
+    <div className="space-y-4 fit:flex fit:h-[calc(var(--app-vh)-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0">
       <div className="flex flex-col gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
         <div className="contents min-w-0 flex-1 xl:flex xl:flex-col xl:gap-4">
           <div className="order-1 xl:order-none fit:shrink-0">
@@ -204,7 +205,7 @@ function PayablesCard({ list }: { list: Payable[] }) {
   const head = payablesHeadline(list)
 
   return (
-    <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
+    <Panel className={cx('flex flex-col p-5 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader
         title="Contas a pagar"
         emoji="calendar-spiral"
@@ -312,22 +313,8 @@ function PayablesCard({ list }: { list: Payable[] }) {
 // ---------- para onde vai ----------
 
 const MAX_CATEGORIES = 7
-/** Em janelas baixas (variante "tight" do CSS) cabem menos linhas sem rolar o cartão. */
-const TIGHT = '(min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem)'
-const useMedia = (query: string): boolean => {
-  const [on, setOn] = useState(() => window.matchMedia(query).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const update = () => setOn(mq.matches)
-    update()
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [query])
-  return on
-}
-
 function BreakdownCard({ sum }: { sum: Summary }) {
-  const limit = useMedia(TIGHT) ? 5 : MAX_CATEGORIES
+  const limit = useLayoutMode() === 'tight' ? 4 : MAX_CATEGORIES
   // As maiores aparecem; o resto vira uma linha só — o cartão não cresce sem limite.
   const rows = useMemo(() => {
     if (sum.byCategory.length <= limit) return sum.byCategory
@@ -337,7 +324,7 @@ function BreakdownCard({ sum }: { sum: Summary }) {
   }, [sum.byCategory, limit])
   const max = Math.max(0, ...rows.map((r) => r.amount))
   return (
-    <Panel className={cx('p-5 sm:p-6', SCROLL)}>
+    <Panel className={cx('p-5 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader title="Para onde vai" emoji="chart-bar">
         <p className="mt-3 text-caption text-muted">Total das saídas</p>
         <div className="mt-1">
@@ -409,7 +396,7 @@ function CardsCard() {
   const y = (amount: number) => 90 - (amount / max) * 80
 
   return (
-    <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
+    <Panel className={cx('flex flex-col p-5 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader title="Cartões" emoji="card">
         <p className="mt-3 text-caption text-muted">
           Fatura de {monthLower(month)}
@@ -429,7 +416,7 @@ function CardsCard() {
         </div>
       ) : (
         <>
-          <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
+          <div className="mt-3 flex shrink-0 tight:mt-2 items-center justify-between gap-2">
             <Button size="sm" onClick={() => openForm({ type: 'invoice', cardId: current.card.id, month })}>
               Ver fatura
             </Button>
@@ -460,14 +447,14 @@ function CardsCard() {
           {/* a fileira sangra até a borda direita do painel: o próximo cartão aparece pela metade, como convite */}
           <div
             ref={strip}
-            className="no-scrollbar -mr-5 mt-3 flex shrink-0 gap-3 overflow-x-auto py-1 pr-5 sm:-mr-6 sm:pr-6"
+            className="no-scrollbar -mr-5 mt-3 flex shrink-0 tight:mt-2 gap-3 overflow-x-auto py-1 pr-5 sm:-mr-6 sm:pr-6"
           >
             {invoices.map((inv, i) => (
               <CardVisual
                 key={inv.card.id}
                 card={inv.card}
                 invoice={inv}
-                className="!w-[min(320px,82%)] fit:!w-[min(272px,74%)]"
+                className="!w-[min(320px,82%)] fit:!w-[min(272px,74%)] tight:!w-[min(216px,66%)]"
                 onClick={() => (i === index ? openForm({ type: 'invoice', cardId: inv.card.id, month }) : go(i))}
               />
             ))}

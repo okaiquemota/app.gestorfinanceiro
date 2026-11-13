@@ -82,13 +82,14 @@
 }
 
 /*
- * "fit": telas de computador com altura suficiente. Nelas a Visão geral ocupa
- * exatamente a janela, sem rolagem da página; se um cartão tiver mais conteúdo
- * do que cabe, ele rola por dentro.
+ * "fit": no computador, a Visão geral ocupa exatamente a janela, sem rolagem
+ * da página; se um cartão tiver mais conteúdo do que cabe, ele rola por dentro.
+ * "tight": o mesmo, em janelas baixas, onde somem os detalhes pra caber o essencial.
+ * Quem liga os dois é src/lib/scale.ts (atributos data-fit / data-tight no <html>),
+ * porque a interface é escalada com `zoom` e media queries não enxergam isso.
  */
-@custom-variant fit (@media (min-width: 80rem) and (min-height: 50rem));
-/* "tight": modo fit em janelas baixas (até ~990px): some o que é detalhe pra caber o essencial */
-@custom-variant tight (@media (min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem));
+@custom-variant fit (&:where([data-fit] *));
+@custom-variant tight (&:where([data-tight] *));
 
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
@@ -137,7 +138,7 @@ html {
 }
 
 body {
-  min-height: 100dvh;
+  min-height: var(--app-vh, 100dvh);
   font-size: 14px;
   line-height: 1.45;
 }
@@ -202,8 +203,7 @@ dialog.sheet::backdrop {
 .sheet-form {
   display: flex;
   flex-direction: column;
-  max-height: min(88vh, 760px);
-  max-height: min(88dvh, 760px);
+  max-height: min(calc(var(--app-vh, 100dvh) * 0.88), 760px);
 }
 .sheet-body {
   flex: 0 1 auto;
@@ -223,8 +223,7 @@ dialog.sheet::backdrop {
     animation: rise 0.2s ease-out;
   }
   .sheet-form {
-    max-height: 90vh;
-    max-height: 92dvh;
+    max-height: calc(var(--app-vh, 100dvh) * 0.92);
   }
 }
 @keyframes pop {

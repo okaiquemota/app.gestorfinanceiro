@@ -60,14 +60,14 @@ export function App() {
 
   if (boot.phase === 'loading')
     return (
-      <div className="flex min-h-dvh items-center justify-center" role="status" aria-label="Carregando">
+      <div className="flex min-h-(--app-vh) items-center justify-center" role="status" aria-label="Carregando">
         <Emoji name="mascote" size={72} className="animate-pulse" />
       </div>
     )
 
   if (boot.phase === 'error')
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 px-6 text-center">
+      <div className="flex min-h-(--app-vh) flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-muted">{boot.message}</p>
         <Button variant="primary" onClick={load}>
           Tentar de novo

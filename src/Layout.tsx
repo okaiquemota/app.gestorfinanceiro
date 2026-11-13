@@ -91,7 +91,7 @@ function ThemeSwitch() {
 function Sidebar({ path }: { path: string }) {
   const { state } = useStore()
   return (
-    <aside className="sticky top-4 hidden h-[calc(100dvh-32px)] w-[232px] shrink-0 flex-col rounded-panel border border-line bg-surface p-3 shadow-card lg:flex">
+    <aside className="sticky top-4 hidden h-[calc(var(--app-vh)-32px)] w-[232px] shrink-0 flex-col rounded-panel border border-line bg-surface p-3 shadow-card lg:flex">
       <Link href="/" className="flex items-center gap-2.5 px-2 pb-4 pt-2">
         <Emoji name="mascote" size={40} />
         <span>
