@@ -294,3 +294,93 @@ main:focus {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
+
+/* ---------- movimento ----------
+ * Curto e com propósito: mostrar o que entrou na tela, o que mudou e o que
+ * respondeu ao toque. Tudo some com prefers-reduced-motion (regra acima).
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes check-pop {
+  40% {
+    transform: scale(1.25);
+  }
+}
+@keyframes float {
+  50% {
+    transform: translateY(-5px) rotate(-1.5deg);
+  }
+}
+@keyframes wiggle {
+  25% {
+    transform: rotate(-7deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(7deg) scale(1.05);
+  }
+}
+
+/* troca de tela: os painéis sobem em sequência */
+.page-in .rounded-panel {
+  animation: rise-in 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.page-in .rounded-panel:nth-child(2) {
+  animation-delay: 60ms;
+}
+.page-in .rounded-panel:nth-child(3) {
+  animation-delay: 120ms;
+}
+.page-in > * > :nth-child(2) .rounded-panel,
+.page-in > * > :nth-child(2) > :nth-child(2) .rounded-panel {
+  animation-delay: 90ms;
+}
+.page-in > * > :nth-child(n + 3) .rounded-panel {
+  animation-delay: 150ms;
+}
+
+/* barras: crescem ao aparecer e deslizam quando o valor muda */
+.bar-x {
+  transform-origin: left;
+  animation: grow-x 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: 0.15s;
+  transition: width 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.bar-y {
+  transform-origin: bottom;
+  animation: grow-y 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  transition: height 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.bar-seg {
+  transition: flex-grow 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.check-pop {
+  animation: check-pop 0.28s ease-out;
+}
+
+/* o Poupin respira; ao passar o mouse, se mexe */
+.mascot {
+  animation: float 4.5s ease-in-out infinite;
+}
+.mascot:hover {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+.pop-in {
+  transform-origin: top;
+  animation: pop 0.14s ease-out;
+}

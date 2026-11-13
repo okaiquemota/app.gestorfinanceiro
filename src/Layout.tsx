@@ -198,7 +198,7 @@ function AddMenu() {
         <ChevronDown size={16} className={cx('transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <ul className="absolute right-0 top-12 z-30 w-60 rounded-2xl border border-line bg-surface p-1.5 shadow-pop">
+        <ul className="pop-in absolute right-0 top-12 z-30 w-60 rounded-2xl border border-line bg-surface p-1.5 shadow-pop">
           {items.map((i) => (
             <li key={i.label}>
               <button
@@ -253,7 +253,7 @@ function MonthPicker() {
         <ChevronDown size={16} className={cx('shrink-0 text-faint transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-[272px] rounded-2xl border border-line bg-surface p-3 shadow-pop">
+        <div className="pop-in absolute left-0 top-full z-30 mt-2 w-[272px] rounded-2xl border border-line bg-surface p-3 shadow-pop">
           <div className="flex items-center justify-between">
             <IconButton label="Ano anterior" onClick={() => setViewYear((y) => y - 1)}>
               <ChevronLeft size={18} />
@@ -388,7 +388,10 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="min-w-0 flex-1 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-4">
         <TopBar page={page} />
         <main id="conteudo" ref={main} tabIndex={-1} className="pt-4 outline-none lg:pt-5">
-          {children}
+          {/* a chave refaz o bloco a cada tela, o que dispara a entrada dos painéis */}
+          <div key={path} className="page-in">
+            {children}
+          </div>
         </main>
       </div>
       <BottomNav path={path} />

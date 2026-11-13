@@ -30,7 +30,7 @@ export function Auth({ status, onDone }: { status: AuthStatus; onDone: () => voi
     <main className="flex min-h-(--app-vh) items-center justify-center px-4 py-10">
       <div className="w-full max-w-[400px]">
         <div className="flex flex-col items-center text-center">
-          <Emoji name="mascote" size={104} className="drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />
+          <Emoji name="mascote" size={104} className="mascot drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />
           <h1 className="mt-4 text-2xl font-semibold tracking-[-0.02em]">
             {setup ? 'Bem-vindo ao Poupin' : 'Poupin'}
           </h1>

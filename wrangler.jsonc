@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gestor-financeiro",
+  "name": "poupin",
   "main": "worker/index.ts",
   "compatibility_date": "2026-11-01",
   "workers_dev": true,

@@ -121,12 +121,12 @@ export function CashFlow() {
                   )}
                 >
                   <span
-                    className="w-full max-w-4 rounded-t-[4px]"
-                    style={{ height: `${(r.income / top) * 100}%`, background: 'var(--s-in)' }}
+                    className="bar-y w-full max-w-4 rounded-t-[4px]"
+                    style={{ height: `${(r.income / top) * 100}%`, background: 'var(--s-in)', animationDelay: `${i * 35}ms` }}
                   />
                   <span
-                    className="w-full max-w-4 rounded-t-[4px]"
-                    style={{ height: `${(r.expenses / top) * 100}%`, background: 'var(--s-out)' }}
+                    className="bar-y w-full max-w-4 rounded-t-[4px]"
+                    style={{ height: `${(r.expenses / top) * 100}%`, background: 'var(--s-out)', animationDelay: `${i * 35 + 60}ms` }}
                   />
                 </button>
               ))}

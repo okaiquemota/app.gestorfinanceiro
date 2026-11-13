@@ -111,20 +111,20 @@ function BalanceCard({ sum, allPaid }: { sum: Summary; allPaid: boolean }) {
             </div>
           </div>
         </div>
-        <Emoji name={mascot.pose} alt={mascot.alt} size={104} className="hidden drop-shadow-[0_14px_16px_rgb(0_0_0/0.16)] sm:block" />
+        <Emoji name={mascot.pose} alt={mascot.alt} size={104} className="mascot hidden drop-shadow-[0_14px_16px_rgb(0_0_0/0.16)] sm:block" />
       </div>
 
       <div
         role="img"
         aria-label={`Renda de ${brl(sum.income)}: ${segs.map((s) => `${s.label} ${brl(s.value)}`).join(', ')}, sobra ${brl(sum.leftover)}`}
-        className="mt-5 flex h-2.5 gap-[2px] overflow-hidden rounded-full sm:mt-6"
+        className="bar-x mt-5 flex h-2.5 gap-[2px] overflow-hidden rounded-full sm:mt-6"
       >
         {scale === 0 && <span className="flex-1 bg-sunken" />}
         {segs.map((s) => (
-          <span key={s.label} title={`${s.label}: ${brl(s.value)}`} style={{ flexGrow: s.value, background: s.color }} className="min-w-[3px] rounded-[2px]" />
+          <span key={s.label} title={`${s.label}: ${brl(s.value)}`} style={{ flexGrow: s.value, background: s.color }} className="bar-seg min-w-[3px] rounded-[2px]" />
         ))}
         {sum.leftover > 0 && (
-          <span title={`Sobra: ${brl(sum.leftover)}`} style={{ flexGrow: sum.leftover, background: 'var(--s-left)' }} className="min-w-[3px] rounded-[2px]" />
+          <span title={`Sobra: ${brl(sum.leftover)}`} style={{ flexGrow: sum.leftover, background: 'var(--s-left)' }} className="bar-seg min-w-[3px] rounded-[2px]" />
         )}
       </div>
 

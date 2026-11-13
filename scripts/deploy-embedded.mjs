@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const clientDir = join(root, 'dist/client')
-const builtConfig = JSON.parse(readFileSync(join(root, 'dist/gestor_financeiro/wrangler.json'), 'utf8'))
+const builtConfig = JSON.parse(readFileSync(join(root, 'dist/poupin/wrangler.json'), 'utf8'))
 const outDir = join(root, 'dist/embedded')
 
 const TYPES = {
@@ -50,7 +50,7 @@ for (const full of walk(clientDir)) {
 }
 if (!files['/index.html']) throw new Error('dist/client/index.html não existe. Rode `npm run build` antes.')
 
-const worker = `import api from '../gestor_financeiro/index.js'
+const worker = `import api from '../poupin/index.js'
 
 // caminho -> [content-type, conteúdo em base64]
 const FILES = ${JSON.stringify(files)}

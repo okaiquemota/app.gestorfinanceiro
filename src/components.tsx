@@ -205,7 +205,7 @@ export function Meter({
       aria-valuemax={100}
       className={cx('h-2 overflow-hidden rounded-full bg-sunken', className)}
     >
-      <div className="h-full rounded-full" style={{ width: `${ratio * 100}%`, background: color }} />
+      <div className="bar-x h-full rounded-full" style={{ width: `${ratio * 100}%`, background: color }} />
     </div>
   )
 }

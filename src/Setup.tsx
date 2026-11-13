@@ -158,7 +158,7 @@ export function SetupWizard() {
     primary = 'Começar'
     body = (
       <div className="text-center">
-        <Emoji name="mascote-oi" size={104} className="mx-auto" />
+        <Emoji name="mascote-oi" size={104} className="mascot mx-auto" />
         <h3 className="mt-3 text-xl font-semibold tracking-[-0.01em]">Oi, {firstName}! Eu sou o Poupin. Vamos deixar tudo pronto?</h3>
         <p className="mx-auto mt-1 max-w-xs text-muted">
           São 4 passos rápidos. Dá pra pular qualquer um e completar depois.
@@ -305,7 +305,7 @@ export function SetupWizard() {
     const left = incomeTotal - billsTotal - state.user.daily_budget_cents
     body = (
       <div className="text-center">
-        <Emoji name="mascote-festa" size={104} className="mx-auto" />
+        <Emoji name="mascote-festa" size={104} className="mascot mx-auto" />
         <h3 className="mt-3 text-xl font-semibold tracking-[-0.01em]">Pronto, {firstName}!</h3>
         <dl className="mt-4 space-y-2 text-left">
           <Row label="Renda por mês" cents={incomeTotal} />

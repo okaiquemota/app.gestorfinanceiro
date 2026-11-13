@@ -15,6 +15,36 @@ const MONEY_SIZES = {
   lg: { int: 'text-2xl leading-none tracking-[-0.02em]', small: 'text-xs' },
 }
 
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** Anima um valor em centavos do que estava na tela até o novo, em ~0,5s. */
+function useCountUp(target: number): number {
+  const [shown, setShown] = useState(target)
+  const from = useRef(target)
+  useEffect(() => {
+    const start = from.current
+    if (start === target) return
+    if (reducedMotion()) {
+      from.current = target
+      setShown(target)
+      return
+    }
+    const t0 = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / 500)
+      const eased = 1 - (1 - p) ** 3
+      const value = Math.round(start + (target - start) * eased)
+      from.current = value
+      setShown(value)
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target])
+  return shown
+}
+
 /** Valor em destaque: "R$" apagado, inteiro forte, centavos pequenos. */
 export function Money({
   cents,
@@ -27,7 +57,8 @@ export function Money({
   approx?: boolean
   className?: string
 }) {
-  const { neg, int, dec } = splitBRL(cents)
+  // o número "corre" até o valor novo quando ele muda (troca de mês, conta paga…)
+  const { neg, int, dec } = splitBRL(useCountUp(cents))
   const s = MONEY_SIZES[size]
   return (
     <span className={cx('tnum inline-flex items-baseline whitespace-nowrap font-semibold', className)}>
@@ -101,7 +132,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
-      <Emoji name={emoji} size={emoji.startsWith('mascote') ? 96 : 64} />
+      <Emoji name={emoji} size={emoji.startsWith('mascote') ? 96 : 64} className={emoji.startsWith('mascote') ? 'mascot' : undefined} />
       <h3 className="mt-3 text-base font-semibold">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-muted">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -173,6 +204,8 @@ export function CheckCircle({
   onChange: (v: boolean) => void
   label: string
 }) {
+  // o "pop" só acontece quando a pessoa marca, não quando a lista aparece já marcada
+  const [justChanged, setJustChanged] = useState(false)
   return (
     <button
       type="button"
@@ -182,6 +215,7 @@ export function CheckCircle({
       title={label}
       onClick={(e) => {
         e.stopPropagation()
+        setJustChanged(true)
         onChange(!checked)
       }}
       // área de toque maior que o círculo
@@ -190,6 +224,7 @@ export function CheckCircle({
       <span
         className={cx(
           'flex size-[22px] items-center justify-center rounded-full border-[1.5px] transition-[background-color,border-color,transform] duration-150 group-active:scale-90',
+          checked && justChanged && 'check-pop',
           checked
             ? 'border-good-fill bg-good-fill text-white'
             : 'border-control text-transparent group-hover:border-accent',

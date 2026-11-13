@@ -41,7 +41,7 @@ npm run typecheck
 
 ## Publicando no Cloudflare
 
-No ar em https://gestor-financeiro.okaiquemota.workers.dev. O `database_id` do D1 fica em `wrangler.jsonc`.
+No ar em https://poupin.okaiquemota.workers.dev. O `database_id` do D1 fica em `wrangler.jsonc`.
 
 ```bash
 npm run db:migrate:remote   # só quando houver migração nova
