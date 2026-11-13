@@ -48,6 +48,8 @@ npm run db:migrate:remote   # só quando houver migração nova
 npm run deploy
 ```
 
+O endereço antigo (`gestor-financeiro.okaiquemota.workers.dev`) é um Worker à parte, em `redirect/`, que só redireciona para o novo. Para republicá-lo: `npx wrangler deploy --config redirect/wrangler.json`.
+
 `npm run deploy:embedded` é o plano B: publica o front embutido dentro do próprio Worker, sem a etapa de upload de arquivos estáticos. Serve para ambientes onde esse upload falha com 401 (proxy que reescreve o cabeçalho `Authorization`). O resultado para quem usa é o mesmo.
 
 O segredo `SETUP_CODE` faz a criação da conta exigir um código — evita que outra pessoa crie a conta antes do dono no primeiro acesso. Depois que a conta existe, novos cadastros são recusados de qualquer forma. Para trocar: `npx wrangler secret put SETUP_CODE`.
