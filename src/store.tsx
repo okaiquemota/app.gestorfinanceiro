@@ -36,6 +36,10 @@ type Store = {
   setupOpen: boolean
   openSetup: () => void
   closeSetup: () => void
+  /** Aviso de "teste encerrado, assine para continuar". */
+  paywall: boolean
+  closePaywall: () => void
+  reload: () => Promise<void>
   theme: Theme
   setTheme: (t: Theme) => void
   toast: ToastData | null
@@ -66,6 +70,7 @@ export function StoreProvider({
   const [form, setForm] = useState<FormSpec | null>(null)
   // Abre sozinha só no primeiro acesso: nada cadastrado e ainda não vista neste aparelho.
   const [setupOpen, setSetupOpen] = useState(() => initial.entries.length === 0 && !setupSeen())
+  const [paywall, setPaywall] = useState(false)
   const [toast, setToast] = useState<ToastData | null>(null)
   const [theme, setThemeState] = useState<Theme>(
     () => (document.documentElement.dataset.theme as Theme) ?? 'light',
@@ -100,6 +105,13 @@ export function StoreProvider({
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           onSignedOut()
+          return false
+        }
+        // teste encerrado: em vez de um erro solto, explica e oferece a assinatura
+        if (e instanceof ApiError && e.code === 'subscription_required') {
+          setForm(null)
+          setPaywall(true)
+          if (patch) await reload().catch(() => {})
           return false
         }
         notify(e instanceof Error ? e.message : 'Algo deu errado.')
@@ -152,6 +164,9 @@ export function StoreProvider({
       setupOpen,
       openSetup: () => setSetupOpen(true),
       closeSetup: () => setSetupOpen(false),
+      paywall,
+      closePaywall: () => setPaywall(false),
+      reload,
       theme,
       setTheme,
       toast,
@@ -159,7 +174,7 @@ export function StoreProvider({
       dismissToast,
       logout,
     }),
-    [state, month, run, form, setupOpen, theme, setTheme, toast, notify, dismissToast, logout],
+    [state, month, run, form, setupOpen, paywall, reload, theme, setTheme, toast, notify, dismissToast, logout],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

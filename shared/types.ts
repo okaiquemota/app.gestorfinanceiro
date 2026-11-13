@@ -76,11 +76,25 @@ export type GoalMove = {
   month: string | null
 }
 
+export type Billing = {
+  /** Situação do plano. */
+  status: 'trial' | 'active' | 'cancelled' | 'expired' | 'lifetime'
+  /** 'readonly': o teste acabou e não há assinatura — dá pra ver e exportar, não pra alterar. */
+  access: 'full' | 'readonly'
+  /** A cobrança está configurada no servidor? */
+  enabled: boolean
+  price_cents: number
+  trial_days: number
+  trial_days_left: number
+  paid_until: string | null
+}
+
 export type User = {
   id: string
   email: string
   name: string
   daily_budget_cents: number
+  billing: Billing
 }
 
 export type AppState = {

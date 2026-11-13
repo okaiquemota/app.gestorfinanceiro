@@ -2,6 +2,10 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { AppState, User } from '../shared/types.ts'
+import { billingFor, cancelPreapproval, createCheckout, handleWebhook, syncPreapproval, trialEnd, validWebhook } from './billing.ts'
+import type { BillingEnv, PlanRow } from './billing.ts'
+import { emailEnabled, sendEmail } from './email.ts'
+import type { EmailEnv } from './email.ts'
 import {
   SESSION_COOKIE,
   SESSION_DAYS,
@@ -11,19 +15,18 @@ import {
   sha256,
 } from './auth.ts'
 
-type Env = {
-  DB: D1Database
-  /** Se definido, criar a conta exige este código (protege o primeiro acesso). */
-  SETUP_CODE?: string
-}
+type Env = BillingEnv & EmailEnv & { DB: D1Database }
 type HonoEnv = { Bindings: Env; Variables: { userId: string } }
 type Ctx = Context<HonoEnv>
 
 class HttpError extends Error {
-  status: 400 | 401 | 403 | 404 | 409 | 429
-  constructor(status: HttpError['status'], message: string) {
+  status: 400 | 401 | 402 | 403 | 404 | 409 | 429 | 503
+  /** Código estável para o front reagir (ex.: abrir a tela de assinatura). */
+  code?: string
+  constructor(status: HttpError['status'], message: string, code?: string) {
     super(message)
     this.status = status
+    this.code = code
   }
 }
 
@@ -81,7 +84,7 @@ const today = () => now().slice(0, 10)
 const app = new Hono<HonoEnv>().basePath('/api')
 
 app.onError((err, c) => {
-  if (err instanceof HttpError) return c.json({ error: err.message }, err.status)
+  if (err instanceof HttpError) return c.json({ error: err.message, code: err.code }, err.status)
   console.error(err)
   return c.json({ error: 'Erro inesperado. Tente de novo.' }, 500)
 })
@@ -89,7 +92,8 @@ app.onError((err, c) => {
 app.use('*', async (c, next) => {
   c.header('Cache-Control', 'no-store')
   // CSRF: além do cookie SameSite=Strict, toda escrita precisa vir da própria origem.
-  if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+  // (o webhook do Mercado Pago vem de fora e é conferido pela assinatura dele)
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && !c.req.path.endsWith('/billing/webhook')) {
     const origin = c.req.header('Origin')
     if (!origin || new URL(origin).host !== new URL(c.req.url).host)
       throw new HttpError(403, 'Origem não permitida.')
@@ -152,9 +156,6 @@ const throttle = async (c: Ctx): Promise<{ fail: () => Promise<void> }> => {
   }
 }
 
-const userCount = async (db: D1Database): Promise<number> =>
-  (await db.prepare('SELECT COUNT(*) AS n FROM users').first<{ n: number }>())?.n ?? 0
-
 const password = (b: Body, k: string): string => {
   const v = b[k]
   if (typeof v !== 'string' || v.length < 8 || v.length > 200)
@@ -162,39 +163,115 @@ const password = (b: Body, k: string): string => {
   return v
 }
 
-app.get('/auth/status', async (c) => {
-  const userId = await sessionUser(c)
-  return c.json({
-    authenticated: !!userId,
-    // sem conta criada ainda: o front mostra a tela de primeiro acesso
-    needsSetup: !userId && (await userCount(c.env.DB)) === 0,
-    setupCodeRequired: !!c.env.SETUP_CODE,
-  })
+app.get('/auth/status', async (c) => c.json({ authenticated: !!(await sessionUser(c)) }))
+
+/** O que a página de apresentação precisa saber sem login. */
+app.get('/public/plan', (c) => {
+  const b = billingFor({ plan: 'trial', trial_ends_at: null, paid_until: null }, c.env)
+  return c.json({ price_cents: b.price_cents, trial_days: b.trial_days, billing_enabled: b.enabled, email_enabled: emailEnabled(c.env) })
 })
 
 app.post('/auth/signup', async (c) => {
   const b = await readBody(c)
   const guard = await throttle(c)
-  // Gestor de uso individual: só existe uma conta, criada no primeiro acesso.
-  if ((await userCount(c.env.DB)) > 0) throw new HttpError(403, 'Este gestor já tem dono. Faça login.')
-  if (c.env.SETUP_CODE) {
-    const code = typeof b.setup_code === 'string' ? b.setup_code.trim() : ''
-    if (!safeEqual(await sha256(code), await sha256(c.env.SETUP_CODE))) {
-      await guard.fail()
-      throw new HttpError(403, 'Código de primeiro acesso incorreto.')
-    }
-  }
+  if (b.accept_terms !== true) throw new HttpError(400, 'Para criar a conta é preciso aceitar os termos de uso e a política de privacidade.')
   const email = text(b, 'email', { max: 200, min: 3 }).toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'E-mail inválido.')
   const name = text(b, 'name', { max: 60 })
+  const pass = password(b, 'password')
+  // toda tentativa de cadastro conta no freio por IP: evita criação de contas em massa
+  await guard.fail()
+  if (await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first())
+    throw new HttpError(409, 'Já existe uma conta com este e-mail. Entre ou recupere a senha.')
   const salt = randomHex(16)
   const id = crypto.randomUUID()
   await c.env.DB.prepare(
-    'INSERT INTO users (id, email, name, password_hash, password_salt, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    "INSERT INTO users (id, email, name, password_hash, password_salt, created_at, plan, trial_ends_at, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 'trial', ?, ?)",
   )
-    .bind(id, email, name, await hashPassword(password(b, 'password'), salt), salt, now())
+    .bind(id, email, name, await hashPassword(pass, salt), salt, now(), trialEnd(c.env), now())
     .run()
   await startSession(c, id)
+  return c.json({ ok: true })
+})
+
+// ---------- recuperação de senha ----------
+
+app.post('/auth/forgot', async (c) => {
+  const b = await readBody(c)
+  const guard = await throttle(c)
+  await guard.fail()
+  if (!emailEnabled(c.env))
+    throw new HttpError(503, 'A recuperação de senha por e-mail ainda não está disponível. Fale com o suporte.')
+  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
+  const user = await c.env.DB.prepare('SELECT id, name FROM users WHERE email = ?').bind(email).first<{ id: string; name: string }>()
+  if (user) {
+    const token = randomHex(32)
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM password_resets WHERE user_id = ? OR expires_at < ?').bind(user.id, Date.now()),
+      c.env.DB.prepare('INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, ?)').bind(
+        await sha256(token),
+        user.id,
+        Date.now() + 60 * 60_000,
+      ),
+    ])
+    const link = `${new URL(c.req.url).origin}/nova-senha?token=${token}`
+    const first = user.name.split(' ')[0].replace(/[<>&"]/g, '')
+    await sendEmail(
+      c.env,
+      email,
+      'Poupin: criar uma nova senha',
+      `<p>Oi, ${first}.</p><p>Recebemos um pedido para criar uma nova senha no Poupin. O link vale por 1 hora:</p><p><a href="${link}">${link}</a></p><p>Se não foi você, é só ignorar este e-mail: sua senha continua a mesma.</p>`,
+    )
+  }
+  // mesma resposta existindo ou não a conta: não revela quem tem cadastro
+  return c.json({ ok: true })
+})
+
+app.post('/auth/reset', async (c) => {
+  const b = await readBody(c)
+  const guard = await throttle(c)
+  const token = typeof b.token === 'string' ? b.token : ''
+  const row = await c.env.DB.prepare('SELECT user_id FROM password_resets WHERE token_hash = ? AND expires_at > ?')
+    .bind(await sha256(token), Date.now())
+    .first<{ user_id: string }>()
+  if (!row) {
+    await guard.fail()
+    throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo.')
+  }
+  const salt = randomHex(16)
+  await c.env.DB.batch([
+    c.env.DB.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').bind(
+      await hashPassword(password(b, 'password'), salt),
+      salt,
+      row.user_id,
+    ),
+    c.env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(row.user_id),
+    c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(row.user_id),
+  ])
+  await startSession(c, row.user_id)
+  return c.json({ ok: true })
+})
+
+// ---------- aviso de pagamento (Mercado Pago) ----------
+
+app.post('/billing/webhook', async (c) => {
+  if (!c.env.MP_ACCESS_TOKEN) return c.json({ ok: true })
+  const body = (await c.req.json().catch(() => ({}))) as { type?: string; data?: { id?: string | number } }
+  const url = new URL(c.req.url)
+  const type = body.type ?? url.searchParams.get('type') ?? ''
+  const dataId = String(body.data?.id ?? url.searchParams.get('data.id') ?? '')
+  if (!dataId) return c.json({ ok: true })
+  if (
+    c.env.MP_WEBHOOK_SECRET &&
+    !(await validWebhook(c.env.MP_WEBHOOK_SECRET, c.req.header('x-signature'), c.req.header('x-request-id'), dataId))
+  )
+    throw new HttpError(401, 'Assinatura inválida.')
+  try {
+    await handleWebhook(c.env, type, dataId)
+  } catch {
+    // erro ao consultar o Mercado Pago: responde 503 para ele tentar de novo mais tarde
+    throw new HttpError(503, 'Não foi possível processar o aviso agora.')
+  }
   return c.json({ ok: true })
 })
 
@@ -229,7 +306,97 @@ app.use('*', async (c, next) => {
   const userId = await sessionUser(c)
   if (!userId) throw new HttpError(401, 'Sessão expirada. Faça login de novo.')
   c.set('userId', userId)
+  // Teste encerrado e sem assinatura: dá pra ver e exportar, não pra alterar.
+  // Assinar, sair, trocar senha e excluir a conta continuam liberados.
+  const free = /\/(auth|billing|account)\//.test(c.req.path)
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && !free) {
+    const u = await planRow(c.env.DB, userId)
+    if (u && billingFor(u, c.env).access === 'readonly')
+      throw new HttpError(402, 'Seu teste grátis terminou. Assine para continuar lançando e editando.', 'subscription_required')
+  }
   await next()
+})
+
+const planRow = (db: D1Database, uid: string) =>
+  db.prepare('SELECT plan, trial_ends_at, paid_until FROM users WHERE id = ?').bind(uid).first<PlanRow>()
+
+// ---------- assinatura ----------
+
+const billingUser = (c: Ctx) =>
+  c.env.DB.prepare('SELECT id, email, mp_preapproval_id FROM users WHERE id = ?')
+    .bind(c.get('userId'))
+    .first<{ id: string; email: string; mp_preapproval_id: string | null }>()
+
+const requireBilling = (c: Ctx) => {
+  if (!c.env.MP_ACCESS_TOKEN) throw new HttpError(503, 'A assinatura ainda não está disponível. Tente de novo mais tarde.')
+}
+
+app.post('/billing/checkout', async (c) => {
+  requireBilling(c)
+  const user = await billingUser(c)
+  if (!user) throw new HttpError(404, 'Conta não encontrada.')
+  try {
+    return c.json({ url: await createCheckout(c.env, user, new URL(c.req.url).origin) })
+  } catch {
+    throw new HttpError(503, 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.')
+  }
+})
+
+// Ao voltar do Mercado Pago: confere a assinatura sem esperar o aviso automático.
+app.post('/billing/sync', async (c) => {
+  const user = await billingUser(c)
+  if (c.env.MP_ACCESS_TOKEN && user?.mp_preapproval_id) await syncPreapproval(c.env, user.mp_preapproval_id).catch(() => {})
+  return c.json({ ok: true })
+})
+
+app.post('/billing/cancel', async (c) => {
+  requireBilling(c)
+  const user = await billingUser(c)
+  if (!user?.mp_preapproval_id) throw new HttpError(404, 'Você não tem uma assinatura ativa.')
+  try {
+    await cancelPreapproval(c.env, user.mp_preapproval_id)
+  } catch {
+    throw new HttpError(503, 'Não foi possível cancelar agora. Tente de novo em instantes.')
+  }
+  await c.env.DB.prepare("UPDATE users SET plan = 'cancelled' WHERE id = ? AND plan = 'active'").bind(user.id).run()
+  return c.json({ ok: true })
+})
+
+// ---------- excluir a conta (LGPD) ----------
+
+app.post('/account/delete', async (c) => {
+  const b = await readBody(c)
+  const db = c.env.DB
+  const uid = c.get('userId')
+  const user = await db
+    .prepare('SELECT password_hash, password_salt, mp_preapproval_id, plan FROM users WHERE id = ?')
+    .bind(uid)
+    .first<{ password_hash: string; password_salt: string; mp_preapproval_id: string | null; plan: string }>()
+  const pass = typeof b.password === 'string' ? b.password : ''
+  if (!user || !safeEqual(await hashPassword(pass, user.password_salt), user.password_hash))
+    throw new HttpError(403, 'Senha incorreta.')
+  // não deixa uma cobrança correndo para uma conta que não existe mais
+  if (c.env.MP_ACCESS_TOKEN && user.mp_preapproval_id && user.plan === 'active') {
+    try {
+      await cancelPreapproval(c.env, user.mp_preapproval_id)
+    } catch {
+      throw new HttpError(503, 'Não foi possível cancelar sua assinatura no Mercado Pago. Tente de novo em instantes.')
+    }
+  }
+  await db.batch([
+    db.prepare('DELETE FROM goal_moves WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM entry_months WHERE entry_id IN (SELECT id FROM entries WHERE user_id = ?)').bind(uid),
+    db.prepare('DELETE FROM entries WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM goals WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM invoices WHERE card_id IN (SELECT id FROM cards WHERE user_id = ?)').bind(uid),
+    db.prepare('DELETE FROM purchases WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM cards WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM users WHERE id = ?').bind(uid),
+  ])
+  deleteCookie(c, SESSION_COOKIE, { path: '/' })
+  return c.json({ ok: true })
 })
 
 app.post('/auth/password', async (c) => {
@@ -257,9 +424,10 @@ app.post('/auth/password', async (c) => {
 
 // ---------- estado completo ----------
 
-const loadState = async (db: D1Database, uid: string): Promise<AppState> => {
+const loadState = async (env: Env, uid: string): Promise<AppState> => {
+  const db = env.DB
   const [user, entries, entryMonths, cards, purchases, invoices, goals, goalMoves] = await db.batch([
-    db.prepare('SELECT id, email, name, daily_budget_cents FROM users WHERE id = ?').bind(uid),
+    db.prepare('SELECT id, email, name, daily_budget_cents, plan, trial_ends_at, paid_until FROM users WHERE id = ?').bind(uid),
     db
       .prepare(
         'SELECT id, kind, name, category, amount_cents, due_day, start_month, end_month, estimated, goal_id, notes FROM entries WHERE user_id = ? ORDER BY created_at',
@@ -297,8 +465,9 @@ const loadState = async (db: D1Database, uid: string): Promise<AppState> => {
   type Row = Record<string, unknown>
   const flag = (rows: Row[], ...keys: string[]) =>
     rows.map((r) => ({ ...r, ...Object.fromEntries(keys.map((k) => [k, !!r[k]])) }))
+  const { plan, trial_ends_at, paid_until, ...profile } = user.results[0] as Omit<User, 'billing'> & PlanRow
   return {
-    user: user.results[0] as User,
+    user: { ...profile, billing: billingFor({ plan, trial_ends_at, paid_until }, env) },
     entries: flag(entries.results as Row[], 'estimated'),
     entryMonths: flag(entryMonths.results as Row[], 'skipped'),
     cards: cards.results,
@@ -309,11 +478,11 @@ const loadState = async (db: D1Database, uid: string): Promise<AppState> => {
   } as unknown as AppState
 }
 
-app.get('/state', async (c) => c.json(await loadState(c.env.DB, c.get('userId'))))
+app.get('/state', async (c) => c.json(await loadState(c.env, c.get('userId'))))
 
 app.get('/export', async (c) => {
-  const state = await loadState(c.env.DB, c.get('userId'))
-  c.header('Content-Disposition', `attachment; filename="gestor-financeiro-${today()}.json"`)
+  const state = await loadState(c.env, c.get('userId'))
+  c.header('Content-Disposition', `attachment; filename="poupin-${today()}.json"`)
   return c.json({ exported_at: now(), ...state })
 })
 

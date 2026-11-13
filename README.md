@@ -54,6 +54,22 @@ O endereço antigo (`gestor-financeiro.okaiquemota.workers.dev`) é um Worker à
 
 O segredo `SETUP_CODE` faz a criação da conta exigir um código — evita que outra pessoa crie a conta antes do dono no primeiro acesso. Depois que a conta existe, novos cadastros são recusados de qualquer forma. Para trocar: `npx wrangler secret put SETUP_CODE`.
 
+## Aberto ao público: o que configurar
+
+Qualquer pessoa pode criar conta. Cada conta nova ganha um teste grátis; depois dele, sem assinatura, fica só para consulta e exportação.
+
+| O quê | Onde | Para quê |
+|---|---|---|
+| `PLAN_PRICE_CENTS`, `TRIAL_DAYS` | `vars` em `wrangler.jsonc` | Preço mensal em centavos e dias de teste |
+| `MP_ACCESS_TOKEN` | `npx wrangler secret put MP_ACCESS_TOKEN` | Liga a cobrança pelo Mercado Pago. Sem ele ninguém é cobrado nem bloqueado |
+| `MP_WEBHOOK_SECRET` | `npx wrangler secret put MP_WEBHOOK_SECRET` | Confere a assinatura dos avisos de pagamento |
+| `RESEND_API_KEY`, `EMAIL_FROM` | `npx wrangler secret put …` | Envio do e-mail de recuperação de senha (exige domínio próprio verificado no Resend) |
+| Dados do responsável | `src/lib/site.ts` | Nome, CPF/CNPJ, e-mail de contato e foro, usados nos termos e na política de privacidade |
+
+No painel do Mercado Pago, o endereço de webhook é `https://poupin.okaiquemota.workers.dev/api/billing/webhook`, com os eventos de assinatura ("Planos e assinaturas").
+
+Os termos de uso e a política de privacidade (`src/pages/Public.tsx`) são um ponto de partida e precisam de revisão jurídica antes da divulgação.
+
 ## Créditos
 
 Poupin, o mascote (porquinho-cofre roxo, seis poses): imagens geradas por IA no Figma, em `public/emoji/mascote*.webp`.

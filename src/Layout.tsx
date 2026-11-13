@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { addMonths } from '../shared/finance.ts'
 import { currentMonth, monthNames, monthParts, monthTitle } from './lib/format.ts'
+import { planLabel } from './Paywall.tsx'
 import { Link, usePath } from './router.tsx'
 import { useStore } from './store.tsx'
 import type { FormSpec } from './store.tsx'
@@ -115,6 +116,19 @@ function Sidebar({ path }: { path: string }) {
       </nav>
 
       <div className="mt-auto">
+        {/* teste grátis ou teste encerrado: lembrete discreto, com o caminho pra assinar */}
+        {(state.user.billing.status === 'trial' || state.user.billing.status === 'expired') && state.user.billing.enabled && (
+          <Link
+            href="/ajustes"
+            className={cx(
+              'mx-1 mb-1 block rounded-xl px-3 py-2 text-caption font-semibold',
+              state.user.billing.status === 'expired' ? 'bg-bad-soft text-bad' : 'bg-primary-soft text-accent',
+            )}
+          >
+            {planLabel(state.user.billing)}
+            <span className="block font-normal text-muted">Ver assinatura</span>
+          </Link>
+        )}
         <div className="flex items-center justify-between px-3 py-3">
           <span className="flex items-center gap-3 text-sm text-muted">
             <Sun size={16} /> Tema

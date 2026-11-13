@@ -1,27 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AppState } from '../shared/types.ts'
 import { Layout } from './Layout.tsx'
+import { Paywall } from './Paywall.tsx'
+import { SetupWizard } from './Setup.tsx'
 import { FormHost } from './forms.tsx'
 import { ApiError, api } from './lib/api.ts'
 import { Auth } from './pages/Auth.tsx'
-import type { AuthStatus } from './pages/Auth.tsx'
+import type { AuthMode } from './pages/Auth.tsx'
 import { Bills } from './pages/Bills.tsx'
 import { Cards } from './pages/Cards.tsx'
 import { CashFlow } from './pages/CashFlow.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Income } from './pages/Income.tsx'
+import { Landing, Privacy, Terms } from './pages/Public.tsx'
+import type { PublicPlan } from './pages/Public.tsx'
 import { Reserve } from './pages/Reserve.tsx'
 import { Settings } from './pages/Settings.tsx'
-import { usePath } from './router.tsx'
-import { SetupWizard } from './Setup.tsx'
+import { navigate, usePath } from './router.tsx'
 import { StoreProvider, useStore } from './store.tsx'
 import { Button, Emoji } from './ui.tsx'
 
 type Boot =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
-  | { phase: 'auth'; status: AuthStatus }
-  | { phase: 'ready'; state: AppState }
+  | { phase: 'public'; plan: PublicPlan }
+  | { phase: 'ready'; state: AppState; plan: PublicPlan }
 
 const PAGES: Record<string, () => React.JSX.Element> = {
   '/': Dashboard,
@@ -33,10 +36,17 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   '/ajustes': Settings,
 }
 
+const AUTH_ROUTES: Record<string, AuthMode> = {
+  '/entrar': 'login',
+  '/criar-conta': 'signup',
+  '/recuperar-senha': 'forgot',
+  '/nova-senha': 'reset',
+}
+
 /** A configuração inicial dá lugar a um formulário aberto (os dois são modais). */
 function SetupHost() {
-  const { setupOpen, form } = useStore()
-  return setupOpen && !form ? <SetupWizard /> : null
+  const { setupOpen, form, paywall } = useStore()
+  return setupOpen && !form && !paywall ? <SetupWizard /> : null
 }
 
 export function App() {
@@ -45,9 +55,12 @@ export function App() {
 
   const load = useCallback(async () => {
     try {
-      const status = await api<AuthStatus>('GET', '/auth/status')
-      if (!status.authenticated) return setBoot({ phase: 'auth', status })
-      setBoot({ phase: 'ready', state: await api<AppState>('GET', '/state') })
+      const [status, plan] = await Promise.all([
+        api<{ authenticated: boolean }>('GET', '/auth/status'),
+        api<PublicPlan>('GET', '/public/plan'),
+      ])
+      if (!status.authenticated) return setBoot({ phase: 'public', plan })
+      setBoot({ phase: 'ready', state: await api<AppState>('GET', '/state'), plan })
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) return load()
       setBoot({ phase: 'error', message: e instanceof Error ? e.message : 'Não foi possível carregar.' })
@@ -57,6 +70,13 @@ export function App() {
   useEffect(() => {
     load()
   }, [load])
+
+  // fora do app, o título da aba acompanha a tela pública
+  useEffect(() => {
+    if (boot.phase !== 'public') return
+    document.title =
+      path === '/termos' ? 'Termos de uso · Poupin' : path === '/privacidade' ? 'Privacidade · Poupin' : 'Poupin · Saiba quanto sobra no mês'
+  }, [boot.phase, path])
 
   if (boot.phase === 'loading')
     return (
@@ -75,16 +95,34 @@ export function App() {
       </div>
     )
 
-  if (boot.phase === 'auth') return <Auth status={boot.status} onDone={load} />
+  const authenticated = boot.phase === 'ready'
+  if (path === '/termos') return <Terms plan={boot.plan} authenticated={authenticated} />
+  if (path === '/privacidade') return <Privacy authenticated={authenticated} />
+
+  if (boot.phase === 'public') {
+    const mode = AUTH_ROUTES[path]
+    if (mode) return <Auth key={mode} mode={mode} trialDays={boot.plan.trial_days} onDone={load} />
+    return <Landing plan={boot.plan} />
+  }
+
+  // já logado e numa rota de login/cadastro: vai pro app
+  if (AUTH_ROUTES[path]) navigate('/')
 
   const Page = PAGES[path] ?? Dashboard
   return (
-    <StoreProvider initial={boot.state} onSignedOut={load}>
+    <StoreProvider
+      initial={boot.state}
+      onSignedOut={() => {
+        navigate('/')
+        load()
+      }}
+    >
       <Layout>
         <Page />
       </Layout>
       <FormHost />
       <SetupHost />
+      <Paywall />
     </StoreProvider>
   )
 }
