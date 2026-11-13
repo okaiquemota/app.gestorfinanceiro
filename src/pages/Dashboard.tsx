@@ -99,7 +99,7 @@ function BalanceCard({ sum }: { sum: Summary }) {
             </div>
           </div>
         </div>
-        <Emoji name="wallet" size={104} className="hidden drop-shadow-[0_14px_16px_rgb(0_0_0/0.16)] sm:block" />
+        <Emoji name="mascote" size={104} className="hidden drop-shadow-[0_14px_16px_rgb(0_0_0/0.16)] sm:block" />
       </div>
 
       <div

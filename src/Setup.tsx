@@ -158,7 +158,7 @@ export function SetupWizard() {
     primary = 'Começar'
     body = (
       <div className="text-center">
-        <Emoji name="wave" size={64} className="mx-auto" />
+        <Emoji name="mascote" size={96} className="mx-auto" />
         <h3 className="mt-3 text-xl font-semibold tracking-[-0.01em]">Oi, {firstName}. Vamos deixar tudo pronto?</h3>
         <p className="mx-auto mt-1 max-w-xs text-muted">
           São 4 passos rápidos. Dá pra pular qualquer um e completar depois.

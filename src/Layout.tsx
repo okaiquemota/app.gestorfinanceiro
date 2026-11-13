@@ -93,7 +93,7 @@ function Sidebar({ path }: { path: string }) {
   return (
     <aside className="sticky top-4 hidden h-[calc(100dvh-32px)] w-[232px] shrink-0 flex-col rounded-panel border border-line bg-surface p-3 shadow-card lg:flex">
       <Link href="/" className="flex items-center gap-2.5 px-2 pb-4 pt-2">
-        <Emoji name="money-bag" size={34} />
+        <Emoji name="mascote" size={40} />
         <span>
           <span className="block text-lead font-semibold leading-tight">Gestor</span>
           <span className="block text-xs text-muted">Minhas finanças</span>

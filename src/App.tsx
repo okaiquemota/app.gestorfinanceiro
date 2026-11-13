@@ -61,7 +61,7 @@ export function App() {
   if (boot.phase === 'loading')
     return (
       <div className="flex min-h-dvh items-center justify-center" role="status" aria-label="Carregando">
-        <Emoji name="money-bag" size={56} className="animate-pulse" />
+        <Emoji name="mascote" size={72} className="animate-pulse" />
       </div>
     )
 
