@@ -54,6 +54,6 @@ O segredo `SETUP_CODE` faz a criação da conta exigir um código — evita que 
 
 ## Créditos
 
-Mascote (porquinho-cofre azul): imagem gerada por IA no Figma, em `public/emoji/mascote.webp`.
+Mascote (porquinho-cofre roxo, seis poses): imagens geradas por IA no Figma, em `public/emoji/mascote*.webp`.
 
 Ícones 3D: [Fluent Emoji](https://github.com/microsoft/fluentui-emoji) da Microsoft (licença MIT).

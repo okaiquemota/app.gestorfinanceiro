@@ -62,11 +62,22 @@ export function Panel({ className, children }: { className?: string; children: R
   )
 }
 
-export function Emoji({ name, size = 48, className }: { name: string; size?: number; className?: string }) {
+export function Emoji({
+  name,
+  size = 48,
+  className,
+  alt = '',
+}: {
+  name: string
+  size?: number
+  className?: string
+  /** Só quando a imagem diz algo que o texto ao redor não diz. */
+  alt?: string
+}) {
   return (
     <img
       src={`/emoji/${name}.webp`}
-      alt=""
+      alt={alt}
       width={size}
       height={size}
       loading="lazy"
@@ -90,7 +101,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
-      <Emoji name={emoji} size={64} />
+      <Emoji name={emoji} size={emoji.startsWith('mascote') ? 96 : 64} />
       <h3 className="mt-3 text-base font-semibold">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-muted">{children}</p>}
       {action && <div className="mt-4">{action}</div>}

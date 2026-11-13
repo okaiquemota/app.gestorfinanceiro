@@ -74,7 +74,7 @@ export function Bills() {
 
         {list.length === 0 ? (
           <EmptyState
-            emoji="receipt"
+            emoji="mascote-dormindo"
             title={`Nenhuma conta em ${monthLower(month)}`}
             action={
               <Button variant="primary" onClick={add}>

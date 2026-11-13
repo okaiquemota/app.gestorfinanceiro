@@ -15,7 +15,7 @@ export function Reserve() {
     return (
       <Panel>
         <EmptyState
-          emoji="umbrella"
+          emoji="mascote-moeda"
           title="Sua reserva começa aqui"
           action={
             <Button
