@@ -13,7 +13,8 @@ import { Income } from './pages/Income.tsx'
 import { Reserve } from './pages/Reserve.tsx'
 import { Settings } from './pages/Settings.tsx'
 import { usePath } from './router.tsx'
-import { StoreProvider } from './store.tsx'
+import { SetupWizard } from './Setup.tsx'
+import { StoreProvider, useStore } from './store.tsx'
 import { Button, Emoji } from './ui.tsx'
 
 type Boot =
@@ -30,6 +31,12 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   '/reserva': Reserve,
   '/renda': Income,
   '/ajustes': Settings,
+}
+
+/** A configuração inicial dá lugar a um formulário aberto (os dois são modais). */
+function SetupHost() {
+  const { setupOpen, form } = useStore()
+  return setupOpen && !form ? <SetupWizard /> : null
 }
 
 export function App() {
@@ -77,6 +84,7 @@ export function App() {
         <Page />
       </Layout>
       <FormHost />
+      <SetupHost />
     </StoreProvider>
   )
 }

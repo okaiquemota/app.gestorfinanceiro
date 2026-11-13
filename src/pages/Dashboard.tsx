@@ -22,15 +22,10 @@ export function Dashboard() {
   const { state, month } = useStore()
   const sum = useMemo(() => summarize(state, month), [state, month])
   const pay = useMemo(() => payables(state, month), [state, month])
-  const hasIncome = state.entries.some((e) => e.kind === 'income')
-  const hasBills = state.entries.some((e) => e.kind === 'expense')
-  const onboarding = !hasIncome || !hasBills
 
   return (
-    // Com os primeiros passos na tela a página rola normalmente; depois disso,
-    // em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
-    <div className={cx('space-y-4', !onboarding && 'fit:flex fit:h-[calc(100dvh-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0')}>
-      {onboarding && <Onboarding hasIncome={hasIncome} hasBills={hasBills} />}
+    // Em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
+    <div className="space-y-4 fit:flex fit:h-[calc(100dvh-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0">
       <div className="flex flex-col gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
         <div className="contents min-w-0 flex-1 xl:flex xl:flex-col xl:gap-4">
           <div className="order-1 xl:order-none fit:shrink-0">
@@ -40,11 +35,9 @@ export function Dashboard() {
             <BreakdownCard sum={sum} />
             <CardsCard />
           </div>
-          {!onboarding && (
-            <div className="hidden shrink-0 fit:block">
-              <ReserveStrip compact />
-            </div>
-          )}
+          <div className="hidden shrink-0 fit:block">
+            <ReserveStrip compact />
+          </div>
         </div>
         <div className="contents xl:flex xl:w-[392px] xl:shrink-0 xl:flex-col xl:gap-4">
           <div className={cx('order-2 xl:order-none', FILL)}>
@@ -55,7 +48,7 @@ export function Dashboard() {
           </div>
         </div>
       </div>
-      <div className={cx(!onboarding && 'fit:hidden')}>
+      <div className="fit:hidden">
         <ReserveStrip />
       </div>
     </div>
@@ -66,75 +59,6 @@ export function Dashboard() {
 const FILL = 'fit:min-h-0 fit:flex-1'
 /** No modo "fit": cartão do tamanho do espaço, rolando por dentro se precisar. */
 const SCROLL = 'scroll-thin fit:h-full fit:overflow-y-auto'
-
-// ---------- primeiros passos ----------
-
-function Onboarding({ hasIncome, hasBills }: { hasIncome: boolean; hasBills: boolean }) {
-  const { state, openForm } = useStore()
-  const steps = [
-    {
-      done: hasIncome,
-      emoji: 'banknote',
-      title: 'Cadastre sua renda',
-      text: 'Salário e o que mais entra todo mês.',
-      go: () => openForm({ type: 'entry', kind: 'income', preset: { name: 'Salário' } }),
-    },
-    {
-      done: hasBills,
-      emoji: 'receipt',
-      title: 'Adicione suas contas',
-      text: 'Aluguel, luz, internet, parcelas… uma por uma.',
-      go: () => openForm({ type: 'entry', kind: 'expense' }),
-    },
-    {
-      done: state.cards.length > 0,
-      emoji: 'card',
-      title: 'Cadastre seus cartões',
-      text: 'Pra fatura entrar na conta do mês.',
-      go: () => openForm({ type: 'card' }),
-    },
-  ]
-  return (
-    <Panel className="p-5 sm:p-6">
-      <div className="flex items-center gap-3">
-        <Emoji name="wave" size={40} />
-        <div>
-          <h2 className="text-lg font-semibold tracking-[-0.01em]">Vamos organizar isso, {state.user.name.split(' ')[0]}</h2>
-          <p className="text-muted">Três passos e você já enxerga quanto sobra no mês.</p>
-        </div>
-      </div>
-      <ol className="mt-4 grid gap-3 md:grid-cols-3">
-        {steps.map((s, i) => (
-          <li key={s.title}>
-            <button
-              type="button"
-              onClick={s.go}
-              className={cx(
-                'flex h-full w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors',
-                s.done ? 'border-line bg-sunken' : 'border-line-strong hover:border-primary hover:bg-primary-soft',
-              )}
-            >
-              <Emoji name={s.emoji} size={36} className={s.done ? 'opacity-60' : undefined} />
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold">
-                  {i + 1}. {s.title}
-                </span>
-                <span className="block text-caption text-muted">{s.text}</span>
-              </span>
-              {s.done ? (
-                <span className="flex size-6 items-center justify-center rounded-full bg-good-fill text-white">
-                  <Check size={14} strokeWidth={3} />
-                </span>
-              ) : (
-                <ChevronRight size={18} className="text-faint" />
-              )}
-            </button>
-          </li>
-        ))}
-      </ol>
-    </Panel>
-  )
-}
 
 // ---------- saldo previsto ----------
 

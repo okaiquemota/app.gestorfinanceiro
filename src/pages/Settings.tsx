@@ -6,7 +6,7 @@ import { useStore } from '../store.tsx'
 import { Button, Emoji, Field, Panel, Segmented, TextInput } from '../ui.tsx'
 
 export function Settings() {
-  const { state, run, theme, setTheme, logout, notify } = useStore()
+  const { state, run, theme, setTheme, logout, notify, openSetup } = useStore()
   const [name, setName] = useState(state.user.name)
   useEffect(() => setName(state.user.name), [state.user.name])
 
@@ -93,6 +93,16 @@ export function Settings() {
               {busy ? 'Trocando…' : 'Trocar senha'}
             </Button>
           </form>
+        </Panel>
+
+        <Panel className="p-5 sm:p-6">
+          <h2 className="text-lead font-semibold">Configuração inicial</h2>
+          <p className="mt-1 text-caption text-muted">
+            O passo a passo de renda, contas, cartões e dia a dia. Nada do que já está cadastrado é apagado.
+          </p>
+          <Button className="mt-4" onClick={openSetup}>
+            Abrir configuração inicial
+          </Button>
         </Panel>
 
         <Panel className="p-5 sm:p-6">

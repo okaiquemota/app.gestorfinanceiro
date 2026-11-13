@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { AppState, Card, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { ApiError, api } from './lib/api.ts'
 import { currentMonth } from './lib/format.ts'
+import { setupSeen } from './Setup.tsx'
 import type { ToastData } from './ui.tsx'
 
 export type FormSpec =
@@ -31,6 +32,10 @@ type Store = {
   form: FormSpec | null
   openForm: (f: FormSpec) => void
   closeForm: () => void
+  /** Configuração inicial (passo a passo do primeiro acesso). */
+  setupOpen: boolean
+  openSetup: () => void
+  closeSetup: () => void
   theme: Theme
   setTheme: (t: Theme) => void
   toast: ToastData | null
@@ -59,6 +64,8 @@ export function StoreProvider({
   const [state, setState] = useState(initial)
   const [month, setMonth] = useState(currentMonth)
   const [form, setForm] = useState<FormSpec | null>(null)
+  // Abre sozinha só no primeiro acesso: nada cadastrado e ainda não vista neste aparelho.
+  const [setupOpen, setSetupOpen] = useState(() => initial.entries.length === 0 && !setupSeen())
   const [toast, setToast] = useState<ToastData | null>(null)
   const [theme, setThemeState] = useState<Theme>(
     () => (document.documentElement.dataset.theme as Theme) ?? 'light',
@@ -142,6 +149,9 @@ export function StoreProvider({
       form,
       openForm: setForm,
       closeForm: () => setForm(null),
+      setupOpen,
+      openSetup: () => setSetupOpen(true),
+      closeSetup: () => setSetupOpen(false),
       theme,
       setTheme,
       toast,
@@ -149,7 +159,7 @@ export function StoreProvider({
       dismissToast,
       logout,
     }),
-    [state, month, run, form, theme, setTheme, toast, notify, dismissToast, logout],
+    [state, month, run, form, setupOpen, theme, setTheme, toast, notify, dismissToast, logout],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
