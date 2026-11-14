@@ -16,6 +16,7 @@ import { Landing, Privacy, Terms } from './pages/Public.tsx'
 import type { PublicPlan } from './pages/Public.tsx'
 import { Reserve } from './pages/Reserve.tsx'
 import { Settings } from './pages/Settings.tsx'
+import { setScaling } from './lib/scale.ts'
 import { navigate, usePath } from './router.tsx'
 import { StoreProvider, useStore } from './store.tsx'
 import { Button, Emoji } from './ui.tsx'
@@ -71,11 +72,15 @@ export function App() {
     load()
   }, [load])
 
+  // a escala proporcional é só do app; o site público rola normalmente
+  const legal = path === '/termos' || path === '/privacidade'
+  useEffect(() => setScaling(boot.phase === 'ready' && !legal), [boot.phase, legal])
+
   // fora do app, o título da aba acompanha a tela pública
   useEffect(() => {
     if (boot.phase !== 'public') return
     document.title =
-      path === '/termos' ? 'Termos de uso · Poupin' : path === '/privacidade' ? 'Privacidade · Poupin' : 'Poupin · Saiba quanto sobra no mês'
+      path === '/termos' ? 'Termos de uso · Poupin' : path === '/privacidade' ? 'Privacidade · Poupin' : 'Poupin · Quanto vai sobrar este mês?'
   }, [boot.phase, path])
 
   if (boot.phase === 'loading')

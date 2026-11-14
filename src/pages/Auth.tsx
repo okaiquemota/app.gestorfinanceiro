@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../lib/api.ts'
 import { Link, navigate } from '../router.tsx'
+import { PublicShell } from './Public.tsx'
 import { Button, Emoji, Field, TextInput } from '../ui.tsx'
 
 export type AuthMode = 'login' | 'signup' | 'forgot' | 'reset'
@@ -73,13 +74,14 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
     )
 
   return (
+    <PublicShell>
     <main className="flex min-h-(--app-vh) items-center justify-center px-4 py-10">
       <div className="w-full max-w-[400px]">
         <div className="flex flex-col items-center text-center">
           <Link href="/" aria-label="Poupin: página inicial">
             <Emoji name="mascote" size={96} className="mascot drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />
           </Link>
-          <h1 className="mt-3 text-2xl font-semibold tracking-[-0.02em]">{copy.title}</h1>
+          <h1 className="serif mt-4 text-4xl">{copy.title}</h1>
           <p className="mt-1 text-muted">
             {mode === 'signup' ? `${trialDays} dias grátis, sem cartão. Leva menos de um minuto.` : copy.lead}
           </p>
@@ -171,5 +173,6 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
         <p className="mt-5 text-center text-muted">{footer}</p>
       </div>
     </main>
+    </PublicShell>
   )
 }

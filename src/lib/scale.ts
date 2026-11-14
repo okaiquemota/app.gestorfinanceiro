@@ -26,8 +26,17 @@ export type LayoutMode = 'scroll' | 'tight' | 'fit'
 let mode: LayoutMode = 'scroll'
 const listeners = new Set<() => void>()
 
+let enabled = true
+
+/** O site público rola normalmente: lá a escala fica desligada. */
+export const setScaling = (on: boolean) => {
+  if (enabled === on) return
+  enabled = on
+  apply()
+}
+
 const compute = (w: number, h: number): number => {
-  if (w < DESKTOP) return 1
+  if (!enabled || w < DESKTOP) return 1
   const grow = Math.min(w / DESIGN_W, h / DESIGN_H)
   if (grow > 1) return Math.min(grow, MAX_ZOOM)
   // tela baixa: encolhe só o necessário para o layout "fit" caber
@@ -45,7 +54,7 @@ const apply = () => {
   root.style.zoom = zoom === 1 ? '' : String(zoom)
   root.style.setProperty('--app-vh', `${layoutH}px`)
 
-  const next: LayoutMode = w >= DESKTOP && layoutH >= FIT_MIN_H ? (layoutH < TIGHT_BELOW ? 'tight' : 'fit') : 'scroll'
+  const next: LayoutMode = enabled && w >= DESKTOP && layoutH >= FIT_MIN_H ? (layoutH < TIGHT_BELOW ? 'tight' : 'fit') : 'scroll'
   root.toggleAttribute('data-fit', next !== 'scroll')
   root.toggleAttribute('data-tight', next === 'tight')
   if (next !== mode) {
