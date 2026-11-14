@@ -168,7 +168,7 @@ app.get('/auth/status', async (c) => c.json({ authenticated: !!(await sessionUse
 /** O que a página de apresentação precisa saber sem login. */
 app.get('/public/plan', (c) => {
   const b = billingFor({ plan: 'trial', trial_ends_at: null, paid_until: null }, c.env)
-  return c.json({ price_cents: b.price_cents, trial_days: b.trial_days, billing_enabled: b.enabled, email_enabled: emailEnabled(c.env) })
+  return c.json({ price_cents: b.price_cents, annual_price_cents: b.annual_price_cents, trial_days: b.trial_days, billing_enabled: b.enabled, email_enabled: emailEnabled(c.env) })
 })
 
 app.post('/auth/signup', async (c) => {
@@ -338,9 +338,9 @@ app.post('/billing/checkout', async (c) => {
   const origin = new URL(c.req.url).origin
   try {
     const url =
-      b.method === 'card'
-        ? await cardCheckout(c.env, c.get('userId'), origin) // cartão, renova sozinho
-        : await oneOffCheckout(c.env, c.get('userId'), origin) // Pix, boleto ou cartão: 30 dias
+      b.period !== 'year' && b.method === 'card'
+        ? await cardCheckout(c.env, c.get('userId'), origin) // mensal no cartão, renova sozinho
+        : await oneOffCheckout(c.env, c.get('userId'), origin, b.period === 'year' ? 'year' : 'month') // pagamento de um período
     return c.json({ url })
   } catch (e) {
     console.error('checkout', b.method, e instanceof Error ? e.message : e)

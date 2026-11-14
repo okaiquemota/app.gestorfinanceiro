@@ -17,6 +17,7 @@ import { Landing, Privacy, Terms } from './pages/Public.tsx'
 import type { PublicPlan } from './pages/Public.tsx'
 import { Reserve } from './pages/Reserve.tsx'
 import { Settings } from './pages/Settings.tsx'
+import { Subscribe } from './pages/Subscribe.tsx'
 import { setScaling } from './lib/scale.ts'
 import { navigate, usePath } from './router.tsx'
 import { StoreProvider, useStore } from './store.tsx'
@@ -35,6 +36,7 @@ const PAGES: Record<string, () => React.JSX.Element> = {
   '/fluxo': CashFlow,
   '/reserva': Reserve,
   '/renda': Income,
+  '/assinatura': Subscribe,
   '/ajustes': Settings,
 }
 

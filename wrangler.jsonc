@@ -17,7 +17,7 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Preço mensal (em centavos) e duração do teste grátis.
-  "vars": { "PLAN_PRICE_CENTS": "1490", "TRIAL_DAYS": "14" },
+  // Preço mensal e anual (em centavos) e duração do teste grátis.
+  "vars": { "PLAN_PRICE_CENTS": "1490", "ANNUAL_PRICE_CENTS": "14900", "TRIAL_DAYS": "14" },
   "observability": { "enabled": true }
 }

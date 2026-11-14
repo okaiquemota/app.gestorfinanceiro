@@ -15,6 +15,8 @@ export type BillingEnv = {
   MP_WEBHOOK_SECRET?: string
   /** Preço mensal em centavos. */
   PLAN_PRICE_CENTS?: string
+  /** Preço do plano anual em centavos (padrão: 10 mensalidades). */
+  ANNUAL_PRICE_CENTS?: string
   TRIAL_DAYS?: string
 }
 
@@ -28,12 +30,17 @@ const DAY = 86_400_000
 const MP = 'https://api.mercadopago.com'
 /** Folga depois do vencimento, pra cobrança que atrasa um pouco não bloquear ninguém. */
 const GRACE_DAYS = 3
-/** Dias liberados por pagamento avulso. */
-const PREPAID_DAYS = 30
+/** Dias liberados por pagamento avulso, conforme o período comprado. */
+const PERIOD_DAYS = { month: 30, year: 365 } as const
+export type Period = keyof typeof PERIOD_DAYS
+/** O anual pode ser parcelado no cartão em até 12 vezes. */
+const ANNUAL_INSTALLMENTS = 12
 /** Janela pra ligar uma assinatura sem dono a quem acabou de clicar em assinar. */
 const INTENT_WINDOW = 45 * 60_000
 
 export const priceCents = (env: BillingEnv): number => Number(env.PLAN_PRICE_CENTS) || 1490
+export const annualCents = (env: BillingEnv): number => Number(env.ANNUAL_PRICE_CENTS) || priceCents(env) * 10
+const periodCents = (env: BillingEnv, period: Period): number => (period === 'year' ? annualCents(env) : priceCents(env))
 export const trialDays = (env: BillingEnv): number => Number(env.TRIAL_DAYS) || 14
 export const trialEnd = (env: BillingEnv): string => new Date(Date.now() + trialDays(env) * DAY).toISOString()
 
@@ -62,6 +69,7 @@ export const billingFor = (u: PlanRow, env: BillingEnv): Billing => {
     access: status !== 'expired' || !enabled ? 'full' : 'readonly',
     enabled,
     price_cents: priceCents(env),
+    annual_price_cents: annualCents(env),
     trial_days: trialDays(env),
     trial_days_left: inTrial ? left(u.trial_ends_at!) : 0,
     paid_until: u.paid_until,
@@ -97,7 +105,7 @@ const ensurePlan = async (env: BillingEnv, origin: string): Promise<{ id: string
   if (saved) return JSON.parse(saved) as { id: string; url: string }
   const data = await mp(env, 'POST', '/preapproval_plan', {
     reason: 'Poupin — assinatura mensal',
-    back_url: `${origin}/ajustes?assinatura=retorno`,
+    back_url: `${origin}/assinatura?assinatura=retorno`,
     auto_recurring: { frequency: 1, frequency_type: 'months', transaction_amount: priceCents(env) / 100, currency_id: 'BRL' },
   })
   if (typeof data.id !== 'string' || typeof data.init_point !== 'string') throw new Error('Mercado Pago não devolveu o plano')
@@ -164,12 +172,21 @@ export const cancelPreapproval = async (env: BillingEnv, preapprovalId: string):
 
 // ---------- Pix, boleto ou cartão avulso ----------
 
-/** Endereço da página do Mercado Pago pra pagar um mês. */
-export const oneOffCheckout = async (env: BillingEnv, userId: string, origin: string): Promise<string> => {
-  const back = `${origin}/ajustes?pagamento=retorno`
+/** Endereço da página do Mercado Pago pra pagar um período (mês ou ano) de uma vez. */
+export const oneOffCheckout = async (env: BillingEnv, userId: string, origin: string, period: Period): Promise<string> => {
+  const back = `${origin}/assinatura?pagamento=retorno`
   const data = await mp(env, 'POST', '/checkout/preferences', {
-    items: [{ title: `Poupin — ${PREPAID_DAYS} dias`, quantity: 1, unit_price: priceCents(env) / 100, currency_id: 'BRL' }],
-    external_reference: userId,
+    items: [
+      {
+        title: period === 'year' ? 'Poupin — plano anual' : 'Poupin — 30 dias',
+        quantity: 1,
+        unit_price: periodCents(env, period) / 100,
+        currency_id: 'BRL',
+      },
+    ],
+    // quem pagou e qual período: é o que o aviso de pagamento devolve
+    external_reference: `${userId}:${period}`,
+    payment_methods: { installments: period === 'year' ? ANNUAL_INSTALLMENTS : 1 },
     back_urls: { success: back, pending: back, failure: back },
     auto_return: 'approved',
     notification_url: `${origin}/api/billing/webhook`,
@@ -180,16 +197,19 @@ export const oneOffCheckout = async (env: BillingEnv, userId: string, origin: st
 }
 
 /**
- * Contabiliza um pagamento avulso aprovado: soma 30 dias a partir de hoje ou do
- * fim do período já pago, o que for mais tarde. Cada pagamento conta uma vez só.
+ * Contabiliza um pagamento avulso aprovado: soma os dias do período comprado a
+ * partir de hoje ou do fim do que já está pago, o que for mais tarde. Cada
+ * pagamento conta uma vez só.
  */
 export const applyPayment = async (env: BillingEnv, paymentId: string, onlyUser?: string): Promise<boolean> => {
   const db = env.DB
   const pay = await mp(env, 'GET', `/v1/payments/${encodeURIComponent(paymentId)}`)
-  const userId = typeof pay.external_reference === 'string' ? pay.external_reference : ''
+  const [userId, tag] = (typeof pay.external_reference === 'string' ? pay.external_reference : '').split(':')
+  const period: Period = tag === 'year' ? 'year' : 'month'
   if (pay.status !== 'approved' || !userId || (onlyUser && onlyUser !== userId)) return false
-  // valor conferido no servidor: ninguém libera acesso pagando menos
-  if (typeof pay.transaction_amount !== 'number' || Math.round(pay.transaction_amount * 100) < priceCents(env)) return false
+  // valor conferido no servidor: ninguém libera um período pagando menos do que ele custa
+  // (no parcelado, transaction_amount é o valor do plano; os juros ficam à parte)
+  if (typeof pay.transaction_amount !== 'number' || Math.round(pay.transaction_amount * 100) < periodCents(env, period)) return false
   const user = await db.prepare('SELECT plan, paid_until FROM users WHERE id = ?').bind(userId).first<{ plan: string; paid_until: string | null }>()
   if (!user) return false
 
@@ -200,7 +220,7 @@ export const applyPayment = async (env: BillingEnv, paymentId: string, onlyUser?
   if (!fresh.meta.changes) return true // já contabilizado
 
   const from = Math.max(Date.now(), user.paid_until ? Date.parse(user.paid_until) : 0)
-  const until = new Date(from + PREPAID_DAYS * DAY).toISOString()
+  const until = new Date(from + PERIOD_DAYS[period] * DAY).toISOString()
   await db
     // quem tem assinatura no cartão ativa continua "active"; os demais viram mês a mês
     .prepare("UPDATE users SET paid_until = ?, plan = CASE WHEN plan = 'active' THEN 'active' ELSE 'prepaid' END WHERE id = ? AND plan != 'lifetime'")

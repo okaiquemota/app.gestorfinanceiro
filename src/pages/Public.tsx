@@ -9,7 +9,7 @@ import { SITE, orTBD } from '../lib/site.ts'
 import { Link } from '../router.tsx'
 import { Emoji, cx } from '../ui.tsx'
 
-export type PublicPlan = { price_cents: number; trial_days: number; billing_enabled: boolean; email_enabled: boolean }
+export type PublicPlan = { price_cents: number; annual_price_cents: number; trial_days: number; billing_enabled: boolean; email_enabled: boolean }
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
@@ -403,7 +403,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                 )}
                 <p className="mt-4 max-w-lg text-lg font-medium text-muted">
                   {plan.billing_enabled
-                    ? `Os primeiros ${plan.trial_days} dias são grátis. Depois, Pix, cartão ou boleto pelo Mercado Pago. Um plano só, com tudo, e você cancela quando quiser.`
+                    ? `Ou ${brl(plan.annual_price_cents)} no plano anual, em até 12× no cartão. Os primeiros ${plan.trial_days} dias são grátis, e você paga por Pix, cartão ou boleto pelo Mercado Pago.`
                     : `A assinatura ainda não foi aberta. Enquanto isso, o uso é gratuito e tem tudo liberado.`}
                 </p>
               </div>

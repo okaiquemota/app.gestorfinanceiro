@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   ArrowLeftRight,
+  BadgeCheck,
   Banknote,
   ChevronDown,
   ChevronLeft,
@@ -21,7 +22,8 @@ import type { Billing } from '../shared/types.ts'
 import { currentMonth, monthNames, monthParts, monthTitle } from './lib/format.ts'
 import { achievements, newlyUnlocked, streak } from './lib/fun.ts'
 import { planLabel } from './Paywall.tsx'
-import { Link, usePath } from './router.tsx'
+import { api } from './lib/api.ts'
+import { Link, navigate, usePath } from './router.tsx'
 import { useStore } from './store.tsx'
 import type { FormSpec } from './store.tsx'
 import { Emoji, IconButton, Toast, cx } from './ui.tsx'
@@ -35,6 +37,7 @@ const NAV = [
 ]
 const SETTINGS_NAV = [
   { href: '/renda', label: 'Minha renda', icon: Banknote },
+  { href: '/assinatura', label: 'Assinatura', icon: BadgeCheck },
   { href: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
@@ -132,7 +135,7 @@ function Sidebar({ path }: { path: string }) {
             acesso vencido, ou mês a mês/cancelado chegando ao fim */}
         {billingNudge(state.user.billing) && (
           <Link
-            href="/ajustes"
+            href="/assinatura"
             className={cx(
               'mx-1 mb-1 block rounded-xl px-3 py-2 text-caption font-semibold',
               state.user.billing.status === 'expired' ? 'bg-bad-soft text-bad' : 'bg-primary-soft text-accent',
@@ -411,6 +414,29 @@ const PAGE_NAMES: Record<string, string> = Object.fromEntries(
 export function Layout({ children }: { children: ReactNode }) {
   const path = usePath()
   const { toast, dismissToast, state, celebrate, celebration, notify } = useStore()
+
+  // Voltando do Mercado Pago (em qualquer tela): confere o pagamento sem esperar
+  // o aviso automático, e leva a pessoa pra tela de assinatura.
+  const { reload } = useStore()
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (!q.has('assinatura') && !q.has('pagamento')) return
+    window.history.replaceState(null, '', '/assinatura')
+    navigate('/assinatura')
+    const status = q.get('status') ?? q.get('collection_status')
+    api('POST', '/billing/sync', {
+      payment_id: q.get('payment_id') ?? q.get('collection_id') ?? undefined,
+      preapproval_id: q.get('preapproval_id') ?? undefined,
+    })
+      .then(reload)
+      .then(() => {
+        if (status === 'pending' || status === 'in_process')
+          notify('Pagamento em análise. Assim que for aprovado, seu acesso é liberado sozinho.', 'success')
+        else if (status === 'rejected' || status === 'null') notify('O pagamento não foi concluído. Você pode tentar de novo.')
+        else notify('Tudo certo! Sua assinatura foi atualizada.', 'success')
+      })
+      .catch(() => {})
+  }, [reload, notify])
 
   // Conquista nova desde a última visita neste aparelho: comemora. Se já tem uma
   // festa na tela (ex.: acabou de pagar a última conta), vira só um aviso.

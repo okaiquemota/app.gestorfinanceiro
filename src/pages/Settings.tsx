@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Download, LogOut } from 'lucide-react'
-import { PayOptions, planLabel } from '../Paywall.tsx'
+import { planLabel } from '../Paywall.tsx'
 import { api } from '../lib/api.ts'
-import { brl } from '../lib/format.ts'
 import { playCoin, setSoundOn, soundOn } from '../lib/fun.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
@@ -156,28 +155,8 @@ export function Settings() {
 }
 
 function PlanPanel() {
-  const { state, run, reload, notify } = useStore()
-  const [confirming, setConfirming] = useState(false)
+  const { state } = useStore()
   const b = state.user.billing
-
-  // Voltando do Mercado Pago: confere o pagamento sem esperar o aviso automático.
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search)
-    if (!q.has('assinatura') && !q.has('pagamento')) return
-    window.history.replaceState(null, '', '/ajustes')
-    const payment = q.get('payment_id') ?? q.get('collection_id')
-    const status = q.get('status') ?? q.get('collection_status')
-    api('POST', '/billing/sync', { payment_id: payment ?? undefined, preapproval_id: q.get('preapproval_id') ?? undefined })
-      .then(reload)
-      .then(() => {
-        if (status === 'pending' || status === 'in_process')
-          notify('Pagamento em análise. Assim que for aprovado, seu acesso é liberado sozinho.', 'success')
-        else if (status === 'rejected' || status === 'null') notify('O pagamento não foi concluído. Você pode tentar de novo.')
-        else notify('Tudo certo! A situação da sua assinatura foi atualizada.', 'success')
-      })
-      .catch(() => {})
-  }, [reload, notify])
-
   const tone = b.status === 'expired' ? 'bad' : b.status === 'trial' || b.status === 'cancelled' ? 'warn' : 'good'
   return (
     <Panel className="p-5 sm:p-6">
@@ -185,53 +164,20 @@ function PlanPanel() {
         <h2 className="text-lead font-semibold">Assinatura</h2>
         <Badge tone={tone}>{planLabel(b)}</Badge>
       </div>
-      {b.status === 'lifetime' ? (
-        <p className="mt-2 text-caption text-muted">Sua conta tem acesso completo, sem cobrança.</p>
-      ) : !b.enabled ? (
-        <p className="mt-2 text-caption text-muted">
-          A assinatura ainda não foi aberta. Enquanto isso, o uso do Poupin é gratuito e nada é cobrado.
-        </p>
-      ) : b.status === 'active' ? (
-        <>
-          <p className="mt-2 text-caption text-muted">
-            {brl(b.price_cents)} por mês no cartão, cobrados pelo Mercado Pago. Cancelando, o acesso continua até o fim do período
-            já pago.
-          </p>
-          {confirming ? (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span role="alert" className="mr-auto text-sm font-semibold">
-                Cancelar a assinatura?
-              </span>
-              <Button onClick={() => setConfirming(false)}>Não</Button>
-              <Button
-                variant="destructive"
-                onClick={async () => {
-                  await run(() => api('POST', '/billing/cancel'), { success: 'Assinatura cancelada.' })
-                  setConfirming(false)
-                }}
-              >
-                Sim, cancelar
-              </Button>
-            </div>
-          ) : (
-            <Button variant="danger" className="mt-3 !px-0 hover:!bg-transparent" onClick={() => setConfirming(true)}>
-              Cancelar assinatura
-            </Button>
-          )}
-        </>
-      ) : (
-        <>
-          <p className="mb-4 mt-2 text-caption text-muted">
-            {b.status === 'trial'
-              ? 'Você pode pagar agora ou quando o teste acabar. Escolha como:'
-              : b.status === 'prepaid'
-                ? `Seu acesso vai até ${planLabel(b).replace('Pago até ', '')} (${b.paid_days_left === 1 ? 'falta 1 dia' : `faltam ${b.paid_days_left} dias`}). Pagando agora, os 30 dias novos somam ao que já está pago.`
-                : b.status === 'cancelled'
-                  ? 'Você pode voltar quando quiser. Escolha como pagar:'
-                  : 'Seus dados continuam aqui. Pra voltar a lançar e editar, escolha como pagar:'}
-          </p>
-          <PayOptions price={b.price_cents} renew={b.status === 'prepaid'} />
-        </>
+      <p className="mt-2 text-caption text-muted">
+        {b.status === 'lifetime'
+          ? 'Sua conta tem acesso completo, sem cobrança.'
+          : !b.enabled
+            ? 'A assinatura ainda não foi aberta. Enquanto isso, o uso do Poupin é gratuito.'
+            : 'Planos, formas de pagamento e cancelamento ficam na tela de assinatura.'}
+      </p>
+      {b.enabled && b.status !== 'lifetime' && (
+        <Link
+          href="/assinatura"
+          className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover"
+        >
+          {b.status === 'active' ? 'Gerenciar assinatura' : 'Ver planos'} <ChevronRight size={16} />
+        </Link>
       )}
     </Panel>
   )

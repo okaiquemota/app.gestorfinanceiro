@@ -85,6 +85,7 @@ export type Billing = {
   /** A cobrança está configurada no servidor? */
   enabled: boolean
   price_cents: number
+  annual_price_cents: number
   trial_days: number
   trial_days_left: number
   paid_until: string | null
