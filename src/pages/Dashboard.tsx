@@ -14,6 +14,7 @@ import type { Payable, Summary } from '../../shared/finance.ts'
 import { CardVisual, Meter, PanelHeader, PayableRow, daysUntil, dueStatus } from '../components.tsx'
 import { category } from '../lib/categories.ts'
 import { brl, dd, monthLower, monthShort, pct } from '../lib/format.ts'
+import { poupinSays } from '../lib/fun.ts'
 import { useLayoutMode } from '../lib/scale.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
@@ -30,7 +31,7 @@ export function Dashboard() {
       <div className="flex flex-col gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
         <div className="contents min-w-0 flex-1 xl:flex xl:flex-col xl:gap-4">
           <div className="order-1 xl:order-none fit:shrink-0">
-            <BalanceCard sum={sum} allPaid={pay.length > 0 && pay.every((p) => p.paid)} />
+            <BalanceCard sum={sum} list={pay} allPaid={pay.length > 0 && pay.every((p) => p.paid)} />
           </div>
           <div className={cx('order-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
             <BreakdownCard sum={sum} />
@@ -73,8 +74,10 @@ const mascotFor = (sum: Summary, allPaid: boolean): { pose: string; alt: string 
         ? { pose: 'mascote-festa', alt: 'Poupin comemorando: todas as contas do mês estão pagas' }
         : { pose: 'mascote-moeda', alt: 'Poupin abraçando uma moeda: está sobrando dinheiro no mês' }
 
-function BalanceCard({ sum, allPaid }: { sum: Summary; allPaid: boolean }) {
+function BalanceCard({ sum, allPaid, list }: { sum: Summary; allPaid: boolean; list: Payable[] }) {
+  const { state, month } = useStore()
   const mascot = mascotFor(sum, allPaid)
+  const says = useMemo(() => poupinSays(state, month, sum, list), [state, month, sum, list])
   const segs = [
     { label: 'Moradia', value: sum.housing, color: 'var(--s-housing)' },
     { label: 'Outras contas', value: sum.bills, color: 'var(--s-bills)' },
@@ -107,7 +110,10 @@ function BalanceCard({ sum, allPaid }: { sum: Summary; allPaid: boolean }) {
                   As saídas passam da renda
                 </p>
               )}
-              <p className="text-caption text-muted">valor estimado após pagar todas as contas</p>
+              {/* a fala do Poupin sobre o mês, num balão apontando pra ele */}
+              <p className="relative mt-1.5 inline-block max-w-[19rem] rounded-2xl rounded-bl-md bg-primary-soft px-3 py-1.5 text-caption font-medium leading-snug">
+                {says}
+              </p>
             </div>
           </div>
         </div>

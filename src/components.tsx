@@ -2,12 +2,13 @@
 
 import type { ReactNode } from 'react'
 import { ChevronRight, Wifi } from 'lucide-react'
-import { cardCommitted, dueDate, toISODate } from '../shared/finance.ts'
+import { cardCommitted, dueDate, payables, toISODate } from '../shared/finance.ts'
 import type { InvoiceView, Payable } from '../shared/finance.ts'
 import type { AppState, Card } from '../shared/types.ts'
 import { api } from './lib/api.ts'
 import { CARD_COLORS, category } from './lib/categories.ts'
-import { brl, brlRound, dayMonth } from './lib/format.ts'
+import { brl, brlRound, dayMonth, monthLower } from './lib/format.ts'
+import { playCoin } from './lib/fun.ts'
 import { useStore } from './store.tsx'
 import { Amount, Badge, CheckCircle, Emoji, cx } from './ui.tsx'
 
@@ -29,10 +30,16 @@ export const daysUntil = (iso: string, today = new Date()): number => {
 
 /** Marcar paga/abrir detalhes de uma conta ou fatura, com a tela reagindo na hora. */
 export const usePayableActions = () => {
-  const { run, openForm } = useStore()
+  const { run, openForm, state, celebrate } = useStore()
 
   const setPaid = (p: Payable, paid: boolean) => {
     const paidAt = paid ? toISODate(new Date()) : null
+    if (paid) {
+      // era a última conta em aberto do mês? então é festa; senão, só a moedinha
+      const others = payables(state, p.month).filter((o) => o.key !== p.key)
+      if (others.length > 0 && others.every((o) => o.paid)) celebrate(`Tudo pago em ${monthLower(p.month)}!`)
+      else playCoin()
+    }
     if (p.type === 'entry')
       return run(
         () => api('PUT', `/entries/${p.id}/months/${p.month}`, { paid }),

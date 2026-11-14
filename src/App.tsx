@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AppState } from '../shared/types.ts'
+import { Celebration } from './Celebrate.tsx'
 import { Layout } from './Layout.tsx'
 import { Paywall } from './Paywall.tsx'
 import { SetupWizard } from './Setup.tsx'
@@ -80,7 +81,7 @@ export function App() {
   useEffect(() => {
     if (boot.phase !== 'public') return
     document.title =
-      path === '/termos' ? 'Termos de uso · Poupin' : path === '/privacidade' ? 'Privacidade · Poupin' : 'Poupin · Quanto vai sobrar este mês?'
+      path === '/termos' ? 'Termos de uso · Poupin' : path === '/privacidade' ? 'Privacidade · Poupin' : 'Poupin · Um mês na vida do seu dinheiro'
   }, [boot.phase, path])
 
   if (boot.phase === 'loading')
@@ -128,6 +129,7 @@ export function App() {
       <FormHost />
       <SetupHost />
       <Paywall />
+      <Celebration />
     </StoreProvider>
   )
 }

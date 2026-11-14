@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { api } from '../lib/api.ts'
 import { Link, navigate } from '../router.tsx'
 import { PublicShell } from './Public.tsx'
-import { Button, Emoji, Field, TextInput } from '../ui.tsx'
+import { Emoji, Field, TextInput } from '../ui.tsx'
 
 export type AuthMode = 'login' | 'signup' | 'forgot' | 'reset'
 
@@ -81,7 +81,7 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
           <Link href="/" aria-label="Poupin: página inicial">
             <Emoji name="mascote" size={96} className="mascot drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />
           </Link>
-          <h1 className="serif mt-4 text-4xl">{copy.title}</h1>
+          <h1 className="mt-4 text-4xl font-extrabold tracking-[-0.04em]">{copy.title}</h1>
           <p className="mt-1 text-muted">
             {mode === 'signup' ? `${trialDays} dias grátis, sem cartão. Leva menos de um minuto.` : copy.lead}
           </p>
@@ -96,7 +96,7 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
           </div>
         ) : (
           <form
-            className="mt-6 space-y-4 rounded-panel border border-line bg-surface p-5 shadow-card sm:p-6"
+            className="box mt-6 space-y-4 p-5 shadow-[6px_6px_0_var(--ink)] sm:p-6"
             onSubmit={(e) => {
               e.preventDefault()
               submit()
@@ -165,9 +165,9 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
                 {error}
               </p>
             )}
-            <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy}>
+            <button type="submit" className="btn-ink h-13 w-full text-base disabled:opacity-60" disabled={busy}>
               {busy ? copy.busy : copy.action}
-            </Button>
+            </button>
           </form>
         )}
         <p className="mt-5 text-center text-muted">{footer}</p>

@@ -40,6 +40,10 @@ type Store = {
   paywall: boolean
   closePaywall: () => void
   reload: () => Promise<void>
+  /** Comemoração em tela cheia (confete + Poupin), com a frase a mostrar. */
+  celebration: string | null
+  celebrate: (text: string) => void
+  endCelebration: () => void
   theme: Theme
   setTheme: (t: Theme) => void
   toast: ToastData | null
@@ -71,6 +75,8 @@ export function StoreProvider({
   // Abre sozinha só no primeiro acesso: nada cadastrado e ainda não vista neste aparelho.
   const [setupOpen, setSetupOpen] = useState(() => initial.entries.length === 0 && !setupSeen())
   const [paywall, setPaywall] = useState(false)
+  const [celebration, setCelebration] = useState<string | null>(null)
+  const endCelebration = useCallback(() => setCelebration(null), [])
   const [toast, setToast] = useState<ToastData | null>(null)
   const [theme, setThemeState] = useState<Theme>(
     () => (document.documentElement.dataset.theme as Theme) ?? 'light',
@@ -167,6 +173,9 @@ export function StoreProvider({
       paywall,
       closePaywall: () => setPaywall(false),
       reload,
+      celebration,
+      celebrate: setCelebration,
+      endCelebration,
       theme,
       setTheme,
       toast,
@@ -174,7 +183,7 @@ export function StoreProvider({
       dismissToast,
       logout,
     }),
-    [state, month, run, form, setupOpen, paywall, reload, theme, setTheme, toast, notify, dismissToast, logout],
+    [state, month, run, form, setupOpen, paywall, reload, celebration, endCelebration, theme, setTheme, toast, notify, dismissToast, logout],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

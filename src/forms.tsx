@@ -67,13 +67,17 @@ const useSubmit = () => {
     fn: () => Promise<unknown>,
     opts: { problem?: string | null | false; success?: string } = {},
   ) => {
-    if (busy) return
-    if (opts.problem) return setError(opts.problem)
+    if (busy) return false
+    if (opts.problem) {
+      setError(opts.problem)
+      return false
+    }
     setError(null)
     setBusy(true)
     const ok = await run(fn, { success: opts.success })
     setBusy(false)
     if (ok) closeForm()
+    return ok
   }
   return { busy, error, submit }
 }
@@ -753,7 +757,7 @@ function GoalForm({ goal }: { goal?: Goal }) {
 }
 
 function MoveForm({ goalId, direction }: { goalId: string; direction: 'in' | 'out' }) {
-  const { state, closeForm } = useStore()
+  const { state, closeForm, celebrate } = useStore()
   const { busy, error, submit } = useSubmit()
   const goal = state.goals.find((g) => g.id === goalId)
   const [dir, setDir] = useState(direction)
@@ -783,7 +787,10 @@ function MoveForm({ goalId, direction }: { goalId: string; direction: 'in' | 'ou
                   : null,
             success: dir === 'in' ? 'Valor guardado.' : 'Retirada registrada.',
           },
-        )
+        ).then((ok) => {
+          const hit = ok && dir === 'in' && amount > 0 && goal.target_cents > 0 && balance < goal.target_cents && balance + amount >= goal.target_cents
+          if (hit) celebrate(`Meta batida: ${goal.name}!`)
+        })
       }
       footer={<Footer busy={busy} error={error} label={dir === 'in' ? 'Guardar' : 'Retirar'} />}
     >

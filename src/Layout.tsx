@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   ArrowLeftRight,
@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Flame,
   LayoutGrid,
   Moon,
   PiggyBank,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 import { addMonths } from '../shared/finance.ts'
 import { currentMonth, monthNames, monthParts, monthTitle } from './lib/format.ts'
+import { achievements, newlyUnlocked, streak } from './lib/fun.ts'
 import { planLabel } from './Paywall.tsx'
 import { Link, usePath } from './router.tsx'
 import { useStore } from './store.tsx'
@@ -318,6 +320,24 @@ function MonthPicker() {
   )
 }
 
+/** Meses seguidos fechando no azul. Só aparece quando há sequência pra mostrar. */
+function StreakChip() {
+  const { state } = useStore()
+  const n = useMemo(() => streak(state), [state])
+  if (n < 1) return null
+  return (
+    <Link
+      href="/reserva"
+      title="Meses seguidos fechando no azul. Ver conquistas"
+      className="flex h-10 items-center gap-1.5 rounded-xl bg-good-soft px-3 text-caption font-semibold text-good max-md:hidden"
+    >
+      <Flame size={15} />
+      <span className="tnum">{n}</span>
+      <span className="max-xl:sr-only">{n === 1 ? 'mês no azul' : 'meses no azul'}</span>
+    </Link>
+  )
+}
+
 function TopBar({ page }: { page: string }) {
   const { month, setMonth, state } = useStore()
   return (
@@ -335,6 +355,7 @@ function TopBar({ page }: { page: string }) {
       </h1>
       <MonthPicker />
       <div className="ml-auto flex shrink-0 items-center gap-2 pl-1">
+        <StreakChip />
         <AddMenu />
         <Link
           href="/ajustes"
@@ -378,7 +399,20 @@ const PAGE_NAMES: Record<string, string> = Object.fromEntries(
 
 export function Layout({ children }: { children: ReactNode }) {
   const path = usePath()
-  const { toast, dismissToast } = useStore()
+  const { toast, dismissToast, state, celebrate, celebration, notify } = useStore()
+
+  // Conquista nova desde a última visita neste aparelho: comemora. Se já tem uma
+  // festa na tela (ex.: acabou de pagar a última conta), vira só um aviso.
+  const unlocked = useMemo(() => achievements(state), [state])
+  const partying = useRef(false)
+  partying.current = celebration !== null
+  useEffect(() => {
+    const fresh = newlyUnlocked(unlocked)
+    if (fresh.length === 0) return
+    const title = fresh[fresh.length - 1].title
+    if (partying.current) notify(`Conquista desbloqueada: ${title}`, 'success')
+    else celebrate(`Conquista: ${title}!`)
+  }, [unlocked, celebrate, notify])
   const page = PAGE_NAMES[path] ?? 'Visão geral'
   const main = useRef<HTMLElement>(null)
   const shownPath = useRef(path)

@@ -1,18 +1,15 @@
-// Site público (sem login): apresentação do produto, termos e privacidade.
-// Identidade própria: claro, lavanda e dourado, com o Poupin como guia.
+// Site público (sem login). A página conta um mês inteiro conforme você rola:
+// do dia 1 ao 30, o dinheiro entra, as contas saem e o Poupin reage.
 
 import { useEffect, useId, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { ArrowRight, Check, Minus, Plus } from 'lucide-react'
-import { brl, pct } from '../lib/format.ts'
+import { ArrowDown, ArrowRight } from 'lucide-react'
+import { brl } from '../lib/format.ts'
 import { SITE, orTBD } from '../lib/site.ts'
 import { Link } from '../router.tsx'
 import { Emoji, cx } from '../ui.tsx'
 
 export type PublicPlan = { price_cents: number; trial_days: number; billing_enabled: boolean; email_enabled: boolean }
-
-const CTA =
-  'group inline-flex h-13 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-primary px-6 text-base font-semibold text-on-primary shadow-[0_8px_20px_-6px_rgb(124_58_237/0.6)] transition-[background-color,transform] hover:-translate-y-0.5 hover:bg-primary-hover'
 
 const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
 
@@ -37,54 +34,56 @@ function useReveal() {
   return root
 }
 
-/** Moldura das telas públicas: sempre clara, com a paleta do site. */
+/** Moldura das telas públicas: papel e tinta, sempre clara. */
 export function PublicShell({ children }: { children: ReactNode }) {
-  return <div className="site relative min-h-(--app-vh) overflow-x-clip">{children}</div>
+  return <div className="site relative min-h-(--app-vh)">{children}</div>
 }
 
-function Header({ authenticated }: { authenticated?: boolean }) {
+function Header({ authenticated, floating }: { authenticated?: boolean; floating?: boolean }) {
   return (
-    <header className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-5">
-      <Link href="/" className="flex items-center gap-2.5">
-        <Emoji name="mascote" size={44} />
-        <span className="serif text-[28px]">{SITE.name}</span>
-      </Link>
-      <nav aria-label="Conta" className="flex items-center gap-1.5">
-        {authenticated ? (
-          <Link href="/" className={cx(CTA, '!h-11 !px-5 !text-sm')}>
-            Abrir o app
-          </Link>
-        ) : (
-          <>
-            <Link href="/entrar" className="flex h-11 items-center rounded-2xl px-4 text-sm font-semibold hover:bg-primary-soft">
-              Entrar
+    <header className={cx('z-30 w-full', floating ? 'fixed top-0' : 'relative')}>
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5 sm:py-4">
+        <Link href="/" className="box flex items-center gap-2 py-1 pl-1.5 pr-3.5">
+          <Emoji name="mascote" size={34} />
+          <span className="text-xl font-extrabold tracking-[-0.03em]">{SITE.name}</span>
+        </Link>
+        <nav aria-label="Conta" className="flex items-center gap-2">
+          {authenticated ? (
+            <Link href="/" className="btn-ink h-11 px-4 text-sm">
+              Abrir o app
             </Link>
-            <Link href="/criar-conta" className={cx(CTA, '!h-11 !px-5 !text-sm max-[380px]:hidden')}>
-              Criar conta
-            </Link>
-          </>
-        )}
-      </nav>
+          ) : (
+            <>
+              <Link href="/entrar" className="btn-ink alt h-11 px-4 text-sm">
+                Entrar
+              </Link>
+              <Link href="/criar-conta" className="btn-ink h-11 px-4 text-sm max-[400px]:hidden">
+                Criar conta
+              </Link>
+            </>
+          )}
+        </nav>
+      </div>
     </header>
   )
 }
 
 function Footer() {
   return (
-    <footer className="mx-auto max-w-6xl px-5 pb-8 pt-10">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6 text-caption text-muted">
-        <span className="flex items-center gap-2">
+    <footer className="mx-auto max-w-6xl px-5 pb-8 pt-12">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t-[1.5px] border-line pt-5 text-caption">
+        <span className="flex items-center gap-2 font-semibold">
           <Emoji name="mascote" size={24} />© {new Date().getFullYear()} {SITE.name}
         </span>
-        <nav aria-label="Rodapé" className="flex flex-wrap gap-x-5 gap-y-1">
-          <Link href="/termos" className="py-1 hover:text-fg">
+        <nav aria-label="Rodapé" className="flex flex-wrap gap-x-5 gap-y-1 font-medium">
+          <Link href="/termos" className="py-1 underline-offset-4 hover:underline">
             Termos de uso
           </Link>
-          <Link href="/privacidade" className="py-1 hover:text-fg">
+          <Link href="/privacidade" className="py-1 underline-offset-4 hover:underline">
             Privacidade
           </Link>
           {SITE.supportEmail && (
-            <a href={`mailto:${SITE.supportEmail}`} className="py-1 hover:text-fg">
+            <a href={`mailto:${SITE.supportEmail}`} className="py-1 underline-offset-4 hover:underline">
               Contato
             </a>
           )}
@@ -94,246 +93,186 @@ function Footer() {
   )
 }
 
-// ---------- calculadora do topo ----------
+// ---------- o mês ----------
 
-const SLIDERS = [
-  { key: 'renda', label: 'Quanto você recebe', max: 2000000, step: 10000, color: '#16a34a' },
-  { key: 'contas', label: 'Contas fixas (aluguel, luz, internet…)', max: 1000000, step: 5000, color: '#7c3aed' },
-  { key: 'cartao', label: 'Fatura do cartão', max: 600000, step: 5000, color: '#f5b400' },
-  { key: 'dia', label: 'Dia a dia (mercado, gasolina…)', max: 400000, step: 5000, color: '#e879a6' },
-] as const
+type Beat = { day: number; label: string; amount: number; say: string; pose: string }
 
-type Values = Record<(typeof SLIDERS)[number]['key'], number>
-
-/** A conta do Poupin, ao vivo: a pessoa arrasta os valores e vê quanto sobra. */
-function Calculator({ start, cta }: { start: string; cta: string }) {
-  const [v, setV] = useState<Values>({ renda: 450000, contas: 190000, cartao: 80000, dia: 70000 })
-  const id = useId()
-  const out = v.contas + v.cartao + v.dia
-  const left = v.renda - out
-  const ratio = v.renda > 0 ? left / v.renda : -1
-  const mood =
-    left < 0
-      ? { pose: 'mascote-preocupado', text: 'Opa. As saídas passaram da renda.', tone: 'text-bad' }
-      : ratio >= 0.2
-        ? { pose: 'mascote-festa', text: `Sobram ${pct(left, v.renda)} da renda. Dá até pra guardar.`, tone: 'text-good' }
-        : { pose: 'mascote-moeda', text: `Sobram ${pct(left, v.renda)} da renda. No azul, mas justo.`, tone: 'text-accent' }
-  const scale = Math.max(v.renda, out, 1)
-
-  return (
-    <div className="relative rounded-[28px] border border-line bg-surface p-5 shadow-pop sm:p-7">
-      <Emoji
-        key={mood.pose}
-        name={mood.pose}
-        size={112}
-        className="mascot absolute -top-14 right-4 !h-auto !w-[clamp(84px,22vw,112px)] drop-shadow-[0_12px_16px_rgb(76_29_149/0.25)]"
-      />
-      <p className="pr-28 text-caption font-semibold uppercase tracking-[0.08em] text-accent">Faça a conta agora</p>
-      <p className="mt-1 pr-28 text-muted">Arraste e veja o que o {SITE.name} te mostraria.</p>
-
-      <div className="mt-5 space-y-3.5">
-        {SLIDERS.map((s) => (
-          <div key={s.key}>
-            <div className="flex items-baseline justify-between gap-3">
-              <label htmlFor={`${id}-${s.key}`} className="text-caption font-medium text-muted">
-                {s.label}
-              </label>
-              <span className="tnum font-semibold">{brl(v[s.key])}</span>
-            </div>
-            <input
-              id={`${id}-${s.key}`}
-              type="range"
-              min={0}
-              max={s.max}
-              step={s.step}
-              value={v[s.key]}
-              onChange={(e) => setV({ ...v, [s.key]: Number(e.target.value) })}
-              aria-valuetext={brl(v[s.key])}
-              style={{ '--track': s.color, '--fill': `${(v[s.key] / s.max) * 100}%` } as CSSProperties}
-            />
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 rounded-2xl bg-sunken p-4" role="status" aria-live="polite">
-        <p className="text-caption text-muted">{left < 0 ? 'Falta no mês' : 'Sobra no mês'}</p>
-        <p className={cx('serif tnum text-[clamp(2.25rem,9vw,3.25rem)]', left < 0 && 'text-bad')}>{brl(Math.abs(left))}</p>
-        <div aria-hidden className="mt-3 flex h-2.5 gap-[2px] overflow-hidden rounded-full">
-          {SLIDERS.slice(1).map((s) => (
-            <span key={s.key} className="bar-seg rounded-[2px]" style={{ flexGrow: v[s.key] / scale, background: s.color }} />
-          ))}
-          {left > 0 && <span className="bar-seg rounded-[2px] bg-good-fill" style={{ flexGrow: left / scale }} />}
-        </div>
-        <p className={cx('mt-2.5 text-caption font-semibold', mood.tone)}>{mood.text}</p>
-      </div>
-
-      <Link href={start} className={cx(CTA, 'mt-4 w-full')}>
-        {cta}
-        <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
-      </Link>
-    </div>
-  )
-}
-
-// ---------- pedaços de interface usados como ilustração ----------
-
-function Mock({ children, tint }: { children: ReactNode; tint: string }) {
-  return (
-    <div className="relative">
-      <div aria-hidden className="absolute -inset-3 rotate-2 rounded-[32px] sm:-inset-5" style={{ background: tint }} />
-      <div aria-hidden className="relative rounded-3xl border border-line bg-surface p-5 shadow-pop sm:p-6">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function MockBills() {
-  const rows: [string, string, string, boolean][] = [
-    ['05', 'Aluguel', 'R$ 1.800,00', true],
-    ['10', 'Internet', 'R$ 119,90', true],
-    ['12', 'Fatura do cartão', 'R$ 842,30', false],
-    ['15', 'Academia', 'R$ 99,90', false],
-  ]
-  return (
-    <>
-      <p className="text-caption text-muted">Contas a pagar</p>
-      <p className="serif tnum text-4xl">R$ 942,20</p>
-      <p className="mt-1 text-caption font-semibold text-muted">2 de 4 pagas</p>
-      <ul className="mt-3 divide-y divide-line">
-        {rows.map(([day, name, value, paid]) => (
-          <li key={name} className="flex items-center gap-3 py-2.5 text-sm">
-            <span className={cx('flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px]', paid ? 'border-good-fill bg-good-fill text-white' : 'border-control')}>
-              {paid && <Check size={12} strokeWidth={3.5} />}
-            </span>
-            <span className="tnum w-6 text-caption text-faint">{day}</span>
-            <span className={cx('flex-1 truncate', paid && 'text-faint line-through')}>{name}</span>
-            <span className={cx('tnum font-semibold', paid && 'text-faint')}>{value}</span>
-          </li>
-        ))}
-      </ul>
-    </>
-  )
-}
-
-function MockCard() {
-  return (
-    <>
-      <div className="flex aspect-[1.6] w-[78%] max-w-[280px] flex-col justify-between rounded-2xl bg-[linear-gradient(135deg,#8a3df2,#5a17c9)] p-4 text-white shadow-pop">
-        <span className="flex justify-between text-sm font-semibold">
-          Meu cartão <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px]">Aberta</span>
-        </span>
-        <span className="flex items-end justify-between">
-          <span>
-            <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/70">VENCE</span>
-            <span className="tnum text-sm font-semibold">12/12</span>
-          </span>
-          <span className="text-right">
-            <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/70">FATURA</span>
-            <span className="tnum text-sm font-semibold">R$ 842,30</span>
-          </span>
-        </span>
-      </div>
-      <ul className="mt-4 space-y-2 text-sm">
-        {[
-          ['Notebook', 'parcela 3 de 12', 'R$ 350,00'],
-          ['Mercado', 'à vista', 'R$ 436,40'],
-          ['Streaming', 'assinatura', 'R$ 55,90'],
-        ].map(([name, kind, value]) => (
-          <li key={name} className="flex items-baseline justify-between gap-3">
-            <span>
-              {name} <span className="text-caption text-faint">· {kind}</span>
-            </span>
-            <span className="tnum font-semibold">{value}</span>
-          </li>
-        ))}
-      </ul>
-    </>
-  )
-}
-
-function MockFlow() {
-  const months = ['Dez', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai']
-  const left = [38, 22, 46, 52, 52, 60]
-  return (
-    <>
-      <p className="text-caption text-muted">Sobra prevista, mês a mês</p>
-      <div className="mt-4 flex h-36 items-end gap-2.5">
-        {left.map((h, i) => (
-          <span key={months[i]} className="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-            <span className={cx('w-full rounded-t-lg', i === 1 ? 'bg-[#f5b400]' : 'bg-primary')} style={{ height: `${h * 1.1}px` }} />
-            <span className="text-micro text-faint">{months[i]}</span>
-          </span>
-        ))}
-      </div>
-      <p className="mt-3 rounded-xl bg-[#fff3cc] px-3 py-2 text-caption font-semibold text-[#6b4a00]">Janeiro aperta: é o mês do IPVA.</p>
-    </>
-  )
-}
-
-function MockGoal() {
-  return (
-    <>
-      <div className="flex items-center gap-3">
-        <Emoji name="umbrella" size={44} />
-        <div>
-          <p className="font-semibold">Reserva de emergência</p>
-          <p className="tnum text-caption text-muted">R$ 6.200,00 de R$ 10.000,00</p>
-        </div>
-      </div>
-      <div className="mt-4 h-3 overflow-hidden rounded-full bg-sunken">
-        <div className="h-full w-[62%] rounded-full bg-good-fill" />
-      </div>
-      <p className="mt-3 text-sm text-muted">
-        Faltam R$ 3.800,00. Guardando <strong className="text-fg">R$ 475,00 por mês</strong>, você chega lá em julho.
-      </p>
-    </>
-  )
-}
-
-const ROWS: { tag: string; title: string; text: string; mock: ReactNode; tint: string }[] = [
-  {
-    tag: 'Contas a pagar',
-    title: 'Nenhuma conta te pega de surpresa.',
-    text: 'Tudo organizado pelo dia do vencimento. Você marca o que pagou, vê o que falta e o que atrasou. As contas que se repetem aparecem sozinhas no mês seguinte.',
-    mock: <MockBills />,
-    tint: '#efe7fe',
-  },
-  {
-    tag: 'Cartões',
-    title: 'A fatura deixa de ser um susto.',
-    text: 'Cada compra cai na fatura certa pelo dia de fechamento do cartão. Parcelas e assinaturas já aparecem nos meses seguintes, antes de a fatura chegar.',
-    mock: <MockCard />,
-    tint: '#fff3cc',
-  },
-  {
-    tag: 'Fluxo de caixa',
-    title: 'Você enxerga o aperto meses antes.',
-    text: 'Uma projeção dos próximos 12 meses, com o que entra, o que sai e quanto sobra em cada um. Dá tempo de se preparar para o mês difícil.',
-    mock: <MockFlow />,
-    tint: '#e3f6ea',
-  },
-  {
-    tag: 'Reserva',
-    title: 'Guardar vira um plano, não uma intenção.',
-    text: 'Crie metas com valor e prazo. O Poupin calcula quanto guardar por mês e acompanha o progresso de cada uma.',
-    mock: <MockGoal />,
-    tint: '#fde8f0',
-  },
+/** Um mês de exemplo. O saldo começa em R$ 320 e os lançamentos somam até o dia 30. */
+const START = 32000
+const MONTH: Beat[] = [
+  { day: 1, label: 'Começa o mês', amount: 0, say: 'Dia 1. Tem R$ 320 na conta e um mês inteiro pela frente.', pose: 'mascote' },
+  { day: 5, label: 'Salário', amount: 450000, say: 'Caiu o salário! Rico por algumas horas.', pose: 'mascote-festa' },
+  { day: 6, label: 'Aluguel', amount: -180000, say: 'O aluguel já deu a primeira mordida.', pose: 'mascote' },
+  { day: 10, label: 'Luz e internet', amount: -30980, say: 'Luz e internet. Até aqui, normal.', pose: 'mascote' },
+  { day: 12, label: 'Fatura do cartão', amount: -84230, say: 'A fatura. Sempre maior do que você lembrava.', pose: 'mascote-preocupado' },
+  { day: 15, label: 'Mercado', amount: -43600, say: 'Mercado do mês. Metade do caminho.', pose: 'mascote' },
+  { day: 18, label: 'Parcela do notebook', amount: -35000, say: 'Aquela parcela que você tinha esquecido.', pose: 'mascote-preocupado' },
+  { day: 20, label: 'Academia', amount: -9990, say: 'Academia. Essa pelo menos faz bem.', pose: 'mascote' },
+  { day: 23, label: 'Farmácia', amount: -28000, say: 'Imprevisto. Sempre tem um.', pose: 'mascote-preocupado' },
+  { day: 27, label: 'Gasolina', amount: -22000, say: 'Reta final. Será que dá?', pose: 'mascote-preocupado' },
+  { day: 30, label: 'Fim do mês', amount: 0, say: 'Deu. Sobraram R$ 482. Ufa.', pose: 'mascote-moeda' },
 ]
+const LEFTOVER = START + MONTH.reduce((s, b) => s + b.amount, 0)
+const DAYS = 30
+const WEEKDAYS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D']
+/** O dia 1 cai numa terça neste mês de exemplo. */
+const OFFSET = 1
 
-const MOODS: [string, string, string][] = [
-  ['mascote-moeda', 'Sobrando', 'Tem dinheiro livre no mês.'],
-  ['mascote-festa', 'Tudo pago', 'Nenhuma conta em aberto.'],
-  ['mascote-preocupado', 'Apertou', 'As saídas passaram da renda.'],
-  ['mascote-dormindo', 'Mês vazio', 'Ainda não tem nada lançado.'],
+const short = (cents: number): string => {
+  const v = Math.abs(cents) / 100
+  return `${cents > 0 ? '+' : '−'}${v >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}k` : Math.round(v)}`
+}
+
+/** Número que "corre" até o valor novo. */
+function useCount(target: number): number {
+  const [shown, setShown] = useState(target)
+  const from = useRef(target)
+  useEffect(() => {
+    const start = from.current
+    if (start === target) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      from.current = target
+      return setShown(target)
+    }
+    const t0 = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / 380)
+      const v = Math.round(start + (target - start) * (1 - (1 - p) ** 3))
+      from.current = v
+      setShown(v)
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target])
+  return shown
+}
+
+/** A cena fica presa na tela enquanto a rolagem avança os dias. */
+function MonthStory() {
+  const track = useRef<HTMLDivElement>(null)
+  const [day, setDay] = useState(1)
+
+  useEffect(() => {
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const el = track.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const span = rect.height - window.innerHeight
+      const p = span > 0 ? Math.min(1, Math.max(0, -rect.top / span)) : 0
+      setDay(Math.min(DAYS, 1 + Math.floor(p * DAYS)))
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      cancelAnimationFrame(raf)
+    }
+  }, [])
+
+  const past = MONTH.filter((b) => b.day <= day)
+  const beat = past[past.length - 1]
+  const balance = START + past.reduce((s, b) => s + b.amount, 0)
+  const shown = useCount(balance)
+  const tense = balance < 80000 && day > 5 && day < DAYS
+  const byDay = new Map(MONTH.filter((b) => b.amount !== 0).map((b) => [b.day, b]))
+
+  return (
+    <section ref={track} aria-label="Um mês de exemplo, dia a dia" className="relative" style={{ height: `${DAYS * 26}vh` }}>
+      <div
+        className={cx(
+          'sticky top-0 flex h-(--app-vh) flex-col overflow-hidden border-y-[1.5px] border-line pt-[68px] transition-colors duration-500 sm:pt-[76px]',
+          tense ? 'bg-[#ffe7e2]' : day === DAYS ? 'bg-[#e2f7e9]' : 'bg-[#f1e8ff]',
+        )}
+      >
+        {/* avanço do mês */}
+        <div aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-black/10">
+          <div className="h-full bg-primary transition-[width] duration-200" style={{ width: `${((day - 1) / (DAYS - 1)) * 100}%` }} />
+        </div>
+
+        <div className="mx-auto grid min-h-0 w-full max-w-6xl flex-1 items-center gap-x-10 gap-y-3 px-4 pb-4 sm:px-5 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* calendário */}
+          <div className="box mx-auto w-full max-w-[560px] p-2.5 shadow-[6px_6px_0_var(--ink)] sm:p-4 lg:order-2">
+            <div aria-hidden className="grid grid-cols-7 gap-1 text-center text-micro font-bold text-faint sm:gap-1.5">
+              {WEEKDAYS.map((w, i) => (
+                <span key={i}>{w}</span>
+              ))}
+            </div>
+            <ol className="mt-1.5 grid grid-cols-7 gap-1 sm:gap-1.5" aria-hidden>
+              {Array.from({ length: OFFSET }, (_, i) => (
+                <li key={`v${i}`} />
+              ))}
+              {Array.from({ length: DAYS }, (_, i) => {
+                const d = i + 1
+                const ev = byDay.get(d)
+                const done = d < day
+                const today = d === day
+                return (
+                  <li
+                    key={d}
+                    className={cx(
+                      'relative flex aspect-square flex-col rounded-lg border-[1.5px] p-1 transition-colors max-sm:aspect-[1/0.82] sm:p-1.5',
+                      today ? 'border-line bg-[var(--sun)]' : done ? 'border-line/25 bg-black/[0.04]' : 'border-line/25 bg-surface',
+                    )}
+                  >
+                    <span className={cx('tnum text-micro font-bold leading-none sm:text-caption', done && 'text-faint line-through')}>{d}</span>
+                    {ev && d <= day && (
+                      <span
+                        className={cx(
+                          'stamp tnum mt-auto rounded px-0.5 text-center text-[9px] font-extrabold leading-tight text-white sm:text-micro',
+                          ev.amount > 0 ? 'bg-good-fill' : 'bg-[#e2483d]',
+                        )}
+                      >
+                        {short(ev.amount)}
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ol>
+          </div>
+
+          {/* o que está acontecendo */}
+          <div className="lg:order-1" aria-live="polite">
+            <p className="text-caption font-bold uppercase tracking-[0.1em] text-accent">
+              Dia <span className="tnum">{String(day).padStart(2, '0')}</span>
+              <span className="text-faint"> · {beat.label}</span>
+            </p>
+            <p className="mt-1 text-caption font-medium text-muted lg:mt-3">Na conta</p>
+            <p className={cx('tnum text-[clamp(2.5rem,11vw,6rem)] font-extrabold leading-[0.95] tracking-[-0.045em]', tense && 'text-bad')}>
+              {brl(shown)}
+            </p>
+            <div className="mt-3 flex items-end gap-3 lg:mt-7">
+              <Emoji key={beat.pose} name={beat.pose} size={120} className="stamp !h-auto !w-[clamp(64px,13vw,120px)] shrink-0" />
+              <p key={beat.day} className="box stamp relative mb-2 rounded-bl-sm px-3.5 py-2.5 text-[15px] font-semibold leading-snug shadow-[4px_4px_0_var(--ink)] sm:text-lg">
+                {beat.say}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const INSIDE: [string, string][] = [
+  ['Saldo previsto', 'Renda menos contas, cartões e dia a dia. O número que importa, já calculado.'],
+  ['Contas por vencimento', 'O que vence em cada dia, o que foi pago e o que atrasou.'],
+  ['Cartões e parcelas', 'Cada compra na fatura certa, e as próximas faturas antes de chegarem.'],
+  ['Os próximos 12 meses', 'Onde vai apertar, com tempo de se preparar.'],
+  ['Reserva com metas', 'Quanto guardar por mês pra chegar no valor que você quer.'],
 ]
 
 const FAQ: [string, string][] = [
-  [
-    'O Poupin se conecta ao meu banco?',
-    'Não. Você mesmo cadastra renda, contas e cartões. O Poupin nunca pede senha de banco nem acesso à sua conta bancária.',
-  ],
+  ['O Poupin se conecta ao meu banco?', 'Não. Você mesmo cadastra renda, contas e cartões. O Poupin nunca pede senha de banco nem acesso à sua conta bancária.'],
   [
     'Meus dados ficam seguros?',
     'Seus dados ficam na sua conta, protegida por senha, e a conexão é sempre criptografada. Você pode baixar uma cópia de tudo ou excluir a conta quando quiser, direto nos Ajustes.',
@@ -343,29 +282,29 @@ const FAQ: [string, string][] = [
     'E se eu não quiser continuar?',
     'Você não é cobrado. Ao fim do teste a conta fica só para consulta: dá pra ver e exportar tudo, mas não lançar coisas novas, até você assinar ou excluir a conta.',
   ],
-  ['Funciona no celular?', 'Funciona. O Poupin abre no navegador do celular e do computador, sem instalar nada, e os dados são os mesmos nos dois.'],
+  ['Funciona no celular?', 'Funciona. Abre no navegador do celular e do computador, sem instalar nada, com os mesmos dados nos dois.'],
 ]
 
 function Question({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
   const id = useId()
   return (
-    <div className="rounded-2xl border border-line bg-surface">
+    <div className="border-b-[1.5px] border-line">
       <h3>
         <button
           type="button"
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-lead font-semibold"
+          className="flex w-full items-center justify-between gap-4 py-4 text-left text-lg font-bold"
         >
           {q}
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-accent">
-            {open ? <Minus size={16} /> : <Plus size={16} />}
+          <span aria-hidden className={cx('text-2xl font-normal transition-transform', open && 'rotate-45')}>
+            +
           </span>
         </button>
       </h3>
-      <p id={id} hidden={!open} className="px-5 pb-5 text-muted">
+      <p id={id} hidden={!open} className="max-w-2xl pb-5 text-muted">
         {a}
       </p>
     </div>
@@ -379,205 +318,125 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
   return (
     <PublicShell>
       <div ref={root}>
-        <Header authenticated={authenticated} />
+        <Header authenticated={authenticated} floating />
         <main>
-          {/* ---------- abertura: promessa + calculadora ---------- */}
-          <section className="mx-auto grid max-w-6xl items-center gap-x-10 gap-y-16 px-5 pb-16 pt-6 lg:grid-cols-[1.05fr_0.95fr] lg:pt-12">
-            <div className="reveal">
-              <p className="inline-flex items-center gap-2 rounded-full bg-[#fff3cc] px-3.5 py-1.5 text-caption font-semibold text-[#6b4a00]">
-                <Emoji name="coin" size={18} /> Finanças pessoais, sem planilha
-              </p>
-              <h1 className="serif mt-5 text-[clamp(2.75rem,8.5vw,5.25rem)]">
-                Quanto vai <em className="text-accent">sobrar</em> este mês?
-              </h1>
-              <p className="mt-5 max-w-xl text-lg text-muted sm:text-xl">
-                O {SITE.name} junta sua renda, suas contas e as faturas dos cartões e responde essa pergunta todo dia, antes de
-                o mês acabar.
-              </p>
-              <ul className="mt-6 space-y-2 text-muted">
-                {[`${plan.trial_days} dias grátis, sem cartão de crédito`, 'Sem conectar banco nem pedir senha', 'No celular e no computador'].map((t) => (
-                  <li key={t} className="flex items-center gap-2.5">
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-good-soft text-good">
-                      <Check size={13} strokeWidth={3.5} />
-                    </span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="reveal" style={delay(120)}>
-              <Calculator start={start} cta={startLabel} />
-            </div>
+          {/* ---------- convite ---------- */}
+          <section className="mx-auto flex min-h-(--app-vh) max-w-6xl flex-col justify-center px-5 pb-10 pt-24">
+            <Emoji name="mascote-oi" size={150} className="mascot !h-auto !w-[clamp(96px,18vw,150px)]" />
+            <h1 className="mt-5 max-w-4xl text-[clamp(2.75rem,10.5vw,7.5rem)] font-extrabold leading-[0.92] tracking-[-0.05em]">
+              Um mês na vida do seu <span className="bg-[var(--sun)] px-[0.12em]">dinheiro.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-lg font-medium text-muted sm:text-xl">
+              Role a página. Cada rolada é um dia: o salário cai, as contas chegam, e no fim você descobre quanto sobrou.
+            </p>
+            <p className="mt-8 flex items-center gap-2 text-caption font-bold uppercase tracking-[0.1em]">
+              <ArrowDown size={18} className="nudge" /> Começa no dia 1
+            </p>
           </section>
 
-          {/* ---------- o app ---------- */}
-          <section aria-labelledby="app-titulo" className="bg-[linear-gradient(to_bottom,transparent,#efe7fe_30%,#efe7fe_70%,transparent)] py-12">
-            <div className="mx-auto max-w-6xl px-5">
-              <div className="reveal mx-auto max-w-2xl text-center">
-                <h2 id="app-titulo" className="serif text-[clamp(2rem,5.5vw,3.25rem)]">
-                  A sua conta do mês, sempre pronta.
+          <MonthStory />
+
+          {/* ---------- a virada ---------- */}
+          <section className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
+            <p className="reveal text-[clamp(2rem,6.5vw,4.5rem)] font-extrabold leading-[1] tracking-[-0.04em]">
+              Sobraram {brl(LEFTOVER)}.
+              <br />
+              <span className="text-faint">Mas você só descobriu no dia 30.</span>
+            </p>
+            <div className="mt-14 grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="reveal">
+                <h2 className="text-[clamp(1.9rem,5vw,3.25rem)] font-extrabold leading-[1.02] tracking-[-0.035em]">
+                  No {SITE.name}, esse número aparece no <span className="bg-[var(--sun)] px-[0.12em]">dia 1.</span>
                 </h2>
-                <p className="mt-3 text-lg text-muted">
-                  A mesma conta que você acabou de fazer, com os seus números de verdade, atualizada a cada coisa que você lança
-                  ou paga.
+                <p className="mt-4 max-w-md text-lg font-medium text-muted">
+                  Você cadastra o que entra e o que vence. Ele faz a conta do mês inteiro e refaz a cada coisa que você paga.
                 </p>
+                <Link href={start} className="btn-ink mt-7 h-14 px-6 text-lg">
+                  {startLabel} <ArrowRight size={20} />
+                </Link>
+                {!authenticated && <p className="mt-3 text-caption font-medium text-muted">Sem cartão de crédito.</p>}
               </div>
-              <div className="reveal mt-9 rounded-[28px] border border-line bg-surface p-2 shadow-pop sm:p-3" style={delay(100)}>
+              <div className="reveal box overflow-hidden shadow-[8px_8px_0_var(--ink)]" style={delay(100)}>
                 <img
                   src="/tela.webp"
                   alt={`Tela de visão geral do ${SITE.name}: saldo previsto, contas a pagar, categorias de gasto e cartões`}
                   width={1440}
                   height={900}
                   loading="lazy"
-                  className="w-full rounded-[20px]"
+                  className="w-full"
                 />
               </div>
             </div>
           </section>
 
-          {/* ---------- recursos, um por vez ---------- */}
-          <section aria-label="Recursos" className="mx-auto max-w-6xl space-y-20 px-5 py-16 sm:space-y-28 sm:py-24">
-            {ROWS.map((row, i) => (
-              <div key={row.tag} className="grid items-center gap-10 md:grid-cols-2 md:gap-16">
-                <div className={cx('reveal', i % 2 === 1 && 'md:order-2')}>
-                  <p className="text-caption font-semibold uppercase tracking-[0.08em] text-accent">{row.tag}</p>
-                  <h2 className="serif mt-2 text-[clamp(1.9rem,4.6vw,3rem)]">{row.title}</h2>
-                  <p className="mt-4 max-w-md text-lg text-muted">{row.text}</p>
-                </div>
-                <div className="reveal px-3 sm:px-5" style={delay(100)}>
-                  <Mock tint={row.tint}>{row.mock}</Mock>
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* ---------- o mascote ---------- */}
-          <section aria-labelledby="mascote-titulo" className="bg-surface py-16 sm:py-24">
-            <div className="mx-auto max-w-6xl px-5">
-              <div className="reveal mx-auto max-w-2xl text-center">
-                <h2 id="mascote-titulo" className="serif text-[clamp(2rem,5.5vw,3.25rem)]">
-                  O {SITE.name} sente o mês com você.
-                </h2>
-                <p className="mt-3 text-lg text-muted">
-                  O porquinho da tela inicial muda de humor conforme o seu mês. Uma olhada e você já sabe como está.
-                </p>
-              </div>
-              <ul className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
-                {MOODS.map(([pose, title, text], i) => (
-                  <li key={pose} className="reveal rounded-3xl bg-bg p-5 text-center" style={delay(i * 70)}>
-                    <Emoji name={pose} size={128} className="mascot mx-auto !h-auto !w-[min(128px,80%)]" />
-                    <h3 className="serif mt-4 text-2xl">{title}</h3>
-                    <p className="mt-1 text-caption text-muted">{text}</p>
+          {/* ---------- o que tem dentro ---------- */}
+          <section aria-labelledby="dentro" className="border-y-[1.5px] border-line bg-surface">
+            <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
+              <h2 id="dentro" className="reveal text-caption font-bold uppercase tracking-[0.1em] text-accent">
+                O que tem dentro
+              </h2>
+              <ul className="mt-4">
+                {INSIDE.map(([title, text], i) => (
+                  <li key={title} className="reveal grid gap-x-8 gap-y-1 border-t-[1.5px] border-line py-5 first:border-t-0 md:grid-cols-[1fr_1fr] md:items-baseline" style={delay(i * 50)}>
+                    <h3 className="text-[clamp(1.5rem,4vw,2.5rem)] font-extrabold leading-tight tracking-[-0.03em]">{title}</h3>
+                    <p className="text-lg font-medium text-muted">{text}</p>
                   </li>
                 ))}
               </ul>
             </div>
           </section>
 
-          {/* ---------- como começar ---------- */}
-          <section aria-labelledby="como-titulo" className="mx-auto max-w-6xl px-5 py-16 sm:py-24">
-            <h2 id="como-titulo" className="serif reveal max-w-2xl text-[clamp(2rem,5.5vw,3.25rem)]">
-              Do zero ao “quanto sobra” em três passos.
-            </h2>
-            <ol className="mt-10 grid gap-5 md:grid-cols-3">
-              {[
-                ['banknote', 'Conte quanto entra', 'Seu salário e o que mais cair na conta todo mês.'],
-                ['receipt', 'Cadastre contas e cartões', 'Aluguel, luz, internet, parcelas. O Poupin já sugere as mais comuns.'],
-                ['mascote-moeda', 'Veja quanto sobra', 'O saldo aparece na hora e muda a cada conta que você marca como paga.'],
-              ].map(([emoji, title, text], i) => (
-                <li key={title} className="reveal relative rounded-3xl border border-line bg-surface p-6" style={delay(i * 90)}>
-                  <span className="serif absolute right-5 top-3 text-6xl text-primary-soft">{i + 1}</span>
-                  <Emoji name={emoji} size={56} />
-                  <h3 className="serif mt-4 text-2xl">{title}</h3>
-                  <p className="mt-2 text-muted">{text}</p>
-                </li>
-              ))}
-            </ol>
-          </section>
-
           {/* ---------- preço ---------- */}
-          <section id="preco" aria-labelledby="preco-titulo" className="mx-auto max-w-6xl scroll-mt-6 px-5">
-            <div className="reveal grid overflow-hidden rounded-[32px] border border-line bg-surface shadow-pop md:grid-cols-[1.1fr_0.9fr]">
-              <div className="p-7 sm:p-10">
-                <h2 id="preco-titulo" className="serif text-[clamp(2rem,5.5vw,3.25rem)]">
-                  Um plano só, com tudo.
+          <section id="preco" aria-labelledby="preco-titulo" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-16 sm:py-24">
+            <div className="reveal box grid gap-6 p-6 shadow-[8px_8px_0_var(--ink)] sm:p-10 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+              <div>
+                <h2 id="preco-titulo" className="text-caption font-bold uppercase tracking-[0.1em] text-accent">
+                  Quanto custa
                 </h2>
-                <ul className="mt-6 space-y-3 text-lg">
-                  {[
-                    'Contas, rendas e cartões sem limite',
-                    'Projeção dos próximos 12 meses',
-                    'Metas de reserva com prazo',
-                    'Celular e computador',
-                    'Cópia dos seus dados quando quiser',
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-3">
-                      <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-good-soft text-good">
-                        <Check size={13} strokeWidth={3.5} />
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="flex flex-col justify-center bg-primary-soft p-7 sm:p-10">
-                <p className="font-semibold text-accent">{plan.trial_days} dias grátis pra testar</p>
                 {plan.billing_enabled ? (
-                  <p className="mt-2 flex items-baseline gap-2">
-                    <span className="serif tnum text-[clamp(3rem,9vw,4.5rem)]">{brl(plan.price_cents)}</span>
-                    <span className="text-muted">por mês</span>
+                  <p className="mt-2 flex flex-wrap items-baseline gap-x-3">
+                    <span className="tnum text-[clamp(3.25rem,11vw,6rem)] font-extrabold leading-none tracking-[-0.05em]">{brl(plan.price_cents)}</span>
+                    <span className="text-xl font-semibold text-muted">por mês</span>
                   </p>
                 ) : (
-                  <p className="serif mt-2 text-[clamp(2.25rem,6vw,3.25rem)]">Grátis no lançamento</p>
+                  <p className="mt-2 text-[clamp(2.5rem,8vw,4.5rem)] font-extrabold leading-none tracking-[-0.045em]">Grátis no lançamento.</p>
                 )}
-                <p className="mt-2 text-muted">
+                <p className="mt-4 max-w-lg text-lg font-medium text-muted">
                   {plan.billing_enabled
-                    ? 'Depois do teste, pague por Pix, cartão ou boleto pelo Mercado Pago. Cancele quando quiser, sem multa.'
-                    : 'A assinatura ainda não foi aberta. Enquanto isso, o uso é gratuito.'}
+                    ? `Os primeiros ${plan.trial_days} dias são grátis. Depois, Pix, cartão ou boleto pelo Mercado Pago. Um plano só, com tudo, e você cancela quando quiser.`
+                    : `A assinatura ainda não foi aberta. Enquanto isso, o uso é gratuito e tem tudo liberado.`}
                 </p>
-                <Link href={start} className={cx(CTA, 'mt-6')}>
-                  {authenticated ? 'Abrir o app' : 'Começar agora'}
-                  <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
+              </div>
+              <div className="md:text-right">
+                <Link href={start} className="btn-ink h-14 px-6 text-lg">
+                  {authenticated ? 'Abrir o app' : 'Começar agora'} <ArrowRight size={20} />
                 </Link>
               </div>
             </div>
           </section>
 
           {/* ---------- dúvidas ---------- */}
-          <section aria-labelledby="duvidas-titulo" className="mx-auto max-w-3xl px-5 py-16 sm:py-24">
-            <h2 id="duvidas-titulo" className="serif reveal text-center text-[clamp(2rem,5.5vw,3.25rem)]">
-              Antes de você perguntar
+          <section aria-labelledby="duvidas-titulo" className="mx-auto max-w-6xl px-5 pb-8">
+            <h2 id="duvidas-titulo" className="reveal text-caption font-bold uppercase tracking-[0.1em] text-accent">
+              Dúvidas
             </h2>
-            <div className="reveal mt-8 space-y-3" style={delay(80)}>
+            <div className="reveal mt-2 border-t-[1.5px] border-line">
               {FAQ.map(([q, a]) => (
                 <Question key={q} q={q} a={a} />
               ))}
             </div>
           </section>
 
-          {/* ---------- chamada final ---------- */}
-          <section className="mx-auto max-w-6xl px-5">
-            <div className="reveal relative overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#7c3aed,#4c1d95)] px-6 py-14 text-center text-white sm:py-20">
-              <div aria-hidden className="pointer-events-none absolute inset-0">
-                {[8, 22, 37, 55, 70, 86].map((x, i) => (
-                  <span key={x} className="coin absolute top-0" style={{ left: `${x}%`, '--t': `${8 + (i % 3) * 2}s`, '--delay': `${-i * 1.7}s` } as CSSProperties}>
-                    <Emoji name="coin" size={30 + (i % 2) * 10} className="opacity-70" />
-                  </span>
-                ))}
-              </div>
-              <div className="relative">
-                <Emoji name="mascote-festa" size={150} className="mascot mx-auto !h-auto !w-[clamp(104px,20vw,150px)]" />
-                <h2 className="serif mx-auto mt-5 max-w-3xl text-[clamp(2.25rem,7vw,4.25rem)]">
-                  Descubra hoje quanto sobra no seu mês.
-                </h2>
-                <Link
-                  href={start}
-                  className="group mt-8 inline-flex h-14 items-center justify-center gap-2 rounded-2xl bg-white px-8 text-lg font-semibold text-[#4c1d95] transition-transform hover:-translate-y-0.5"
-                >
-                  {startLabel}
-                  <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
-                </Link>
-                {!authenticated && <p className="mt-3 text-caption text-white/80">Sem cartão de crédito. Cancele quando quiser.</p>}
-              </div>
+          {/* ---------- fecho ---------- */}
+          <section className="mx-auto max-w-6xl px-5 py-16 text-center sm:py-24">
+            <Emoji name="mascote-moeda" size={160} className="mascot reveal mx-auto !h-auto !w-[clamp(110px,22vw,160px)]" />
+            <h2 className="reveal mx-auto mt-5 max-w-4xl text-[clamp(2.5rem,9vw,6rem)] font-extrabold leading-[0.95] tracking-[-0.05em]">
+              E o seu mês, como termina?
+            </h2>
+            <div className="reveal mt-8" style={delay(80)}>
+              <Link href={start} className="btn-ink h-14 px-7 text-lg">
+                {startLabel} <ArrowRight size={20} />
+              </Link>
             </div>
           </section>
         </main>
@@ -594,9 +453,9 @@ function LegalPage({ title, children, authenticated }: { title: string; children
     <PublicShell>
       <Header authenticated={authenticated} />
       <main className="mx-auto max-w-3xl px-5 pb-8 pt-6">
-        <h1 className="serif text-[clamp(2.25rem,7vw,3.5rem)]">{title}</h1>
-        <p className="mt-2 text-caption text-muted">Última atualização: {SITE.legalUpdatedAt}</p>
-        <div className="mt-7 space-y-7 text-[15px] leading-relaxed [&_h2]:text-lg [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mt-2 [&_p]:text-muted [&_ul]:mt-2 [&_ul]:space-y-1 [&_ul]:text-muted">
+        <h1 className="text-[clamp(2.25rem,7vw,3.75rem)] font-extrabold leading-none tracking-[-0.04em]">{title}</h1>
+        <p className="mt-3 text-caption font-medium text-muted">Última atualização: {SITE.legalUpdatedAt}</p>
+        <div className="mt-7 space-y-7 text-[15px] leading-relaxed [&_h2]:text-lg [&_h2]:font-bold [&_li]:ml-5 [&_li]:list-disc [&_p]:mt-2 [&_p]:text-muted [&_ul]:mt-2 [&_ul]:space-y-1 [&_ul]:text-muted">
           {children}
         </div>
       </main>

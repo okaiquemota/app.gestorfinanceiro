@@ -2,6 +2,7 @@ import { Minus, Pencil, Plus, Trash2 } from 'lucide-react'
 import { goalBalance, monthDiff } from '../../shared/finance.ts'
 import { Meter } from '../components.tsx'
 import { api } from '../lib/api.ts'
+import { achievements, streak } from '../lib/fun.ts'
 import { brl, currentMonth, dateBR, monthLong, pct } from '../lib/format.ts'
 import { useStore } from '../store.tsx'
 import { Amount, Button, ConfirmButton, Emoji, EmptyState, IconButton, Money, Panel, cx } from '../ui.tsx'
@@ -138,6 +139,41 @@ export function Reserve() {
           </ul>
         )}
       </Panel>
+
+      <AchievementsPanel />
     </div>
+  )
+}
+
+function AchievementsPanel() {
+  const { state } = useStore()
+  const list = achievements(state)
+  const run = streak(state)
+  const done = list.filter((a) => a.done).length
+  return (
+    <Panel className="p-5 sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lead font-semibold">Conquistas</h2>
+        <p className="text-caption text-muted">
+          {done} de {list.length}
+          {run > 0 && <> · {run === 1 ? '1 mês seguido' : `${run} meses seguidos`} no azul</>}
+        </p>
+      </div>
+      <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {list.map((a) => (
+          <li
+            key={a.id}
+            className={cx('flex items-center gap-3 rounded-2xl border p-3', a.done ? 'border-line bg-surface' : 'border-dashed border-line-strong')}
+          >
+            <Emoji name={a.emoji} size={40} className={a.done ? undefined : 'opacity-35 grayscale'} />
+            <span className="min-w-0">
+              <span className={cx('block font-semibold', !a.done && 'text-muted')}>{a.title}</span>
+              <span className="block text-caption text-muted">{a.text}</span>
+              <span className="sr-only">{a.done ? ' (conquistada)' : ' (ainda não)'}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   )
 }

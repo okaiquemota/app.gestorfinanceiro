@@ -1,7 +1,5 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/inter';
-/* títulos do site público: Fraunces, serifada com eixo de suavidade (SOFT) */
-@import '@fontsource-variable/fraunces/soft.css';
 
 /*
  * Design tokens. Cores semânticas trocam sozinhas entre claro e escuro.
@@ -95,7 +93,6 @@
 
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
-  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-sunken: var(--sunken);
@@ -389,60 +386,107 @@ main:focus {
 }
 
 /* ---------- site público ----------
- * Identidade própria do site: claro, em tons de lavanda, com o dourado da moeda
- * do Poupin como segunda cor. Vale sempre, mesmo com o app no tema escuro.
+ * Papel e tinta: fundo de papel, traço preto fino, cores chapadas, sombra dura.
+ * Sem degradê e sem sombra suave. Vale sempre, mesmo com o app no tema escuro.
  */
 .site {
-  --bg: #f8f5ff;
+  --ink: #17131f;
+  --paper: #faf7f0;
+  --bg: var(--paper);
   --surface: #ffffff;
-  --sunken: #f0eafc;
-  --line: #e6def6;
-  --line-strong: #d3c7ee;
-  --fg: #1b1333;
-  --muted: #52496a;
-  --faint: #6c6384;
-  --ghost: #9b93b0;
-  --control: #8b82a3;
+  --sunken: #f1ece0;
+  --line: #17131f;
+  --line-strong: #17131f;
+  --fg: var(--ink);
+  --muted: #4d4759;
+  --faint: #6b6578;
+  --ghost: #9a94a6;
+  --control: #17131f;
   --primary: #7c3aed;
   --primary-hover: #6d28d9;
-  --primary-soft: #efe7fe;
+  --primary-soft: #ebe1ff;
   --accent: #6d28d9;
-  --good: #0b7a34;
-  --good-fill: #16a34a;
-  --good-soft: #e3f6ea;
+  --good: #0f7a3d;
+  --good-fill: #1fae5b;
+  --good-soft: #d9f5e3;
   --warn: #8a5a00;
-  --warn-soft: #fdf1cc;
-  --bad: #c62828;
-  --bad-soft: #fdeaea;
-  --gold: #f5b400;
-  --gold-soft: #fff3cc;
-  --shadow: 0 1px 2px rgb(60 30 120 / 0.06);
-  --shadow-pop: 0 24px 60px -12px rgb(76 29 149 / 0.28), 0 4px 12px rgb(76 29 149 / 0.08);
+  --warn-soft: #ffe9a8;
+  --bad: #c7352b;
+  --bad-soft: #ffdcd8;
+  --sun: #ffd23f;
+  --shadow: none;
+  --shadow-pop: 6px 6px 0 var(--ink);
   color-scheme: light;
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--paper);
+  color: var(--ink);
 }
 
-.serif {
-  font-family: var(--font-display);
-  font-variation-settings: 'SOFT' 100;
-  font-weight: 560;
-  letter-spacing: -0.025em;
-  line-height: 1.02;
+/* caixa com traço e sombra dura; o botão "afunda" ao passar o mouse */
+.box {
+  border: 1.5px solid var(--ink);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.btn-ink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+.btn-ink:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.btn-ink:active {
+  transform: translate(4px, 4px) !important;
+  box-shadow: 0 0 0 var(--ink);
+}
+.btn-ink.alt {
+  background: var(--surface);
+  color: var(--ink);
 }
 
 /* entra ao rolar: só sobe e aparece (o JS liga .in quando o bloco chega na tela) */
 .reveal {
   opacity: 0;
-  transform: translateY(18px);
+  transform: translateY(16px);
   transition:
-    opacity 0.6s ease-out,
-    transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+    opacity 0.5s ease-out,
+    transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
   transition-delay: var(--d, 0ms);
 }
 .reveal.in {
   opacity: 1;
   transform: none;
+}
+
+/* carimbo de lançamento num dia do calendário */
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8) rotate(-8deg);
+  }
+}
+.stamp {
+  animation: stamp 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes nudge {
+  50% {
+    transform: translateY(6px);
+  }
+}
+.nudge {
+  animation: nudge 1.4s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal {
@@ -451,63 +495,47 @@ main:focus {
   }
 }
 
-/* controle deslizante da calculadora */
-.site input[type='range'] {
-  appearance: none;
-  width: 100%;
-  height: 28px;
-  background: transparent;
-  cursor: pointer;
-}
-.site input[type='range']::-webkit-slider-runnable-track {
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(to right, var(--track) var(--fill, 50%), var(--line) var(--fill, 50%));
-}
-.site input[type='range']::-moz-range-track {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--line);
-}
-.site input[type='range']::-moz-range-progress {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--track);
-}
-.site input[type='range']::-webkit-slider-thumb {
-  appearance: none;
-  width: 24px;
-  height: 24px;
-  margin-top: -8px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--track);
-  box-shadow: 0 2px 6px rgb(60 30 120 / 0.25);
-}
-.site input[type='range']::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--track);
-  box-shadow: 0 2px 6px rgb(60 30 120 / 0.25);
-}
-
-/* moedas que caem devagar atrás da chamada final */
-@keyframes coin-fall {
+/* ---------- comemoração ---------- */
+@keyframes confetti-fall {
   from {
-    transform: translateY(-20%) rotate(0deg);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.9;
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 1;
   }
   to {
-    transform: translateY(520%) rotate(220deg);
-    opacity: 0;
+    transform: translate3d(var(--drift, 0), 105vh, 0) rotate(720deg);
+    opacity: 0.9;
   }
 }
-.coin {
-  animation: coin-fall var(--t, 9s) linear infinite;
-  animation-delay: var(--delay, 0s);
+.confetti {
+  animation: confetti-fall linear both;
+}
+@keyframes celebrate-in {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+  60% {
+    scale: 1.04;
+  }
+}
+.celebrate-card {
+  animation: celebrate-in 0.35s ease-out both;
+}
+@keyframes celebrate-jump {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  30% {
+    transform: translateY(-18px) rotate(-6deg);
+  }
+  60% {
+    transform: translateY(0) rotate(4deg);
+  }
+  80% {
+    transform: translateY(-8px);
+  }
+}
+.celebrate-jump {
+  animation: celebrate-jump 0.9s ease-in-out 2;
 }

@@ -3,13 +3,15 @@ import { ChevronRight, Download, LogOut } from 'lucide-react'
 import { useCheckout, planLabel } from '../Paywall.tsx'
 import { api } from '../lib/api.ts'
 import { brl } from '../lib/format.ts'
+import { playCoin, setSoundOn, soundOn } from '../lib/fun.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
-import { Badge, Button, Emoji, Field, Panel, Segmented, TextInput } from '../ui.tsx'
+import { Badge, Button, Emoji, Field, Panel, Segmented, TextInput, Toggle } from '../ui.tsx'
 
 export function Settings() {
   const { state, run, theme, setTheme, logout, notify, openSetup } = useStore()
   const [name, setName] = useState(state.user.name)
+  const [sound, setSound] = useState(soundOn)
   useEffect(() => setName(state.user.name), [state.user.name])
 
   const [current, setCurrent] = useState('')
@@ -72,7 +74,18 @@ export function Settings() {
             ]}
           />
         </div>
-
+        <div className="border-t border-line pt-4">
+          <Toggle
+            checked={sound}
+            onChange={(on) => {
+              setSound(on)
+              setSoundOn(on)
+              if (on) playCoin()
+            }}
+            label="Sons e vibração"
+            hint="Moedinha ao pagar uma conta e fanfarra nas comemorações."
+          />
+        </div>
       </Panel>
 
       <div className="space-y-4">
