@@ -343,8 +343,9 @@ app.post('/billing/checkout', async (c) => {
     return c.json({ url: await createCheckout(c.env, user, new URL(c.req.url).origin, payer) })
   } catch (e) {
     // recusa ligada a quem paga: quase sempre é o e-mail que não bate com a conta do Mercado Pago
-    if (e instanceof Error && /payer|collector/i.test(e.message))
-      throw new HttpError(400, 'O Mercado Pago não aceitou esse e-mail. Use o e-mail da sua conta no Mercado Pago.')
+    // ("User bad request" é o que ele responde quando o e-mail não é de nenhuma conta dele)
+    if (e instanceof Error && /payer|collector|user bad request/i.test(e.message))
+      throw new HttpError(400, 'O Mercado Pago não encontrou uma conta com esse e-mail. Use o e-mail com que você entra no Mercado Pago.')
     throw new HttpError(503, 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.')
   }
 })
