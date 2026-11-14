@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Download, LogOut } from 'lucide-react'
-import { useCheckout, planLabel } from '../Paywall.tsx'
+import { PayerEmail, useCheckout, planLabel } from '../Paywall.tsx'
 import { api } from '../lib/api.ts'
 import { brl } from '../lib/format.ts'
 import { playCoin, setSoundOn, soundOn } from '../lib/fun.ts'
@@ -157,7 +157,7 @@ export function Settings() {
 
 function PlanPanel() {
   const { state, run, reload, notify } = useStore()
-  const { busy, start } = useCheckout()
+  const { busy, start, email, setEmail } = useCheckout()
   const [confirming, setConfirming] = useState(false)
   const b = state.user.billing
 
@@ -220,9 +220,18 @@ function PlanPanel() {
                 ? 'Você pode reativar a assinatura quando quiser.'
                 : `Assine por ${brl(b.price_cents)} por mês pra voltar a lançar e editar. Seus dados continuam aqui.`}
           </p>
-          <Button variant="primary" className="mt-4" onClick={start} disabled={busy} aria-busy={busy}>
-            {busy ? 'Abrindo…' : 'Assinar pelo Mercado Pago'}
-          </Button>
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault()
+              start()
+            }}
+          >
+            <PayerEmail email={email} setEmail={setEmail} />
+            <Button type="submit" variant="primary" disabled={busy} aria-busy={busy}>
+              {busy ? 'Abrindo…' : 'Assinar pelo Mercado Pago'}
+            </Button>
+          </form>
         </>
       )}
     </Panel>

@@ -65,7 +65,7 @@ const mp = async (env: BillingEnv, method: string, path: string, body?: unknown)
   const data = (await res.json().catch(() => null)) as Record<string, unknown> | null
   if (!res.ok) {
     console.error('Mercado Pago', method, path, res.status, JSON.stringify(data))
-    throw new Error(`Mercado Pago respondeu ${res.status}`)
+    throw new Error(`Mercado Pago respondeu ${res.status}: ${typeof data?.message === 'string' ? data.message : ''}`)
   }
   return data ?? {}
 }
@@ -75,11 +75,13 @@ export const createCheckout = async (
   env: BillingEnv,
   user: { id: string; email: string },
   origin: string,
+  /** E-mail da conta do Mercado Pago de quem vai pagar (pode ser diferente do e-mail no Poupin). */
+  payerEmail: string,
 ): Promise<string> => {
   const data = await mp(env, 'POST', '/preapproval', {
     reason: 'Poupin — assinatura mensal',
     external_reference: user.id,
-    payer_email: user.email,
+    payer_email: payerEmail,
     back_url: `${origin}/ajustes?assinatura=retorno`,
     status: 'pending',
     auto_recurring: {

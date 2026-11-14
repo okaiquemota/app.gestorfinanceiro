@@ -335,9 +335,16 @@ app.post('/billing/checkout', async (c) => {
   requireBilling(c)
   const user = await billingUser(c)
   if (!user) throw new HttpError(404, 'Conta não encontrada.')
+  // O Mercado Pago exige o e-mail da conta de quem paga, que nem sempre é o do Poupin.
+  const b = (await c.req.json().catch(() => ({}))) as Body
+  const payer = typeof b.payer_email === 'string' && b.payer_email.trim() ? b.payer_email.trim().toLowerCase() : user.email
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payer) || payer.length > 200) throw new HttpError(400, 'E-mail do Mercado Pago inválido.')
   try {
-    return c.json({ url: await createCheckout(c.env, user, new URL(c.req.url).origin) })
-  } catch {
+    return c.json({ url: await createCheckout(c.env, user, new URL(c.req.url).origin, payer) })
+  } catch (e) {
+    // recusa ligada a quem paga: quase sempre é o e-mail que não bate com a conta do Mercado Pago
+    if (e instanceof Error && /payer|collector/i.test(e.message))
+      throw new HttpError(400, 'O Mercado Pago não aceitou esse e-mail. Use o e-mail da sua conta no Mercado Pago.')
     throw new HttpError(503, 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.')
   }
 })

@@ -5,23 +5,33 @@ import { Check } from 'lucide-react'
 import { api } from './lib/api.ts'
 import { brl, dateBR } from './lib/format.ts'
 import { useStore } from './store.tsx'
-import { Button, Emoji, Modal } from './ui.tsx'
+import { Button, Emoji, Field, Modal, TextInput } from './ui.tsx'
 
 /** Abre o checkout do Mercado Pago para a conta logada. */
 export const useCheckout = () => {
-  const { notify } = useStore()
+  const { state, notify } = useStore()
   const [busy, setBusy] = useState(false)
+  // o Mercado Pago cobra da conta dele com este e-mail, que pode não ser o do Poupin
+  const [email, setEmail] = useState(state.user.email)
   const start = async () => {
     setBusy(true)
     try {
-      const { url } = await api<{ url: string }>('POST', '/billing/checkout')
+      const { url } = await api<{ url: string }>('POST', '/billing/checkout', { payer_email: email })
       window.location.href = url
     } catch (e) {
       notify(e instanceof Error ? e.message : 'Não foi possível abrir o pagamento.')
       setBusy(false)
     }
   }
-  return { busy, start }
+  return { busy, start, email, setEmail }
+}
+
+export function PayerEmail({ email, setEmail }: { email: string; setEmail: (v: string) => void }) {
+  return (
+    <Field label="E-mail da sua conta no Mercado Pago" hint="É com ele que você entra pra pagar. Pode ser diferente do e-mail do Poupin.">
+      <TextInput type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+    </Field>
+  )
 }
 
 export const planLabel = (b: { status: string; trial_days_left: number; paid_until: string | null }): string =>
@@ -37,7 +47,7 @@ export const planLabel = (b: { status: string; trial_days_left: number; paid_unt
 
 export function Paywall() {
   const { state, paywall, closePaywall } = useStore()
-  const { busy, start } = useCheckout()
+  const { busy, start, email, setEmail } = useCheckout()
   if (!paywall) return null
   const b = state.user.billing
   return (
@@ -77,6 +87,7 @@ export function Paywall() {
           </li>
         ))}
       </ul>
+      <PayerEmail email={email} setEmail={setEmail} />
     </Modal>
   )
 }
