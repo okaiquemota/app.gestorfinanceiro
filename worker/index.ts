@@ -342,7 +342,8 @@ app.post('/billing/checkout', async (c) => {
         ? await cardCheckout(c.env, c.get('userId'), origin) // cartão, renova sozinho
         : await oneOffCheckout(c.env, c.get('userId'), origin) // Pix, boleto ou cartão: 30 dias
     return c.json({ url })
-  } catch {
+  } catch (e) {
+    console.error('checkout', b.method, e instanceof Error ? e.message : e)
     throw new HttpError(503, 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.')
   }
 })
