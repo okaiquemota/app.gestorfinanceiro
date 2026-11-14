@@ -1,7 +1,7 @@
 // Tela de assinatura: escolher entre mensal e anual, e como pagar.
 
 import { useState } from 'react'
-import { Check, CreditCard, QrCode, ShieldCheck } from 'lucide-react'
+import { Check, Barcode, CreditCard, ShieldCheck } from 'lucide-react'
 import type { Billing } from '../../shared/types.ts'
 import { paidUntil, planLabel, useCheckout } from '../Paywall.tsx'
 import type { PayChoice } from '../Paywall.tsx'
@@ -47,7 +47,7 @@ export function Subscribe() {
 const headline = (b: Billing): string => {
   if (b.status === 'lifetime') return 'Sua conta tem acesso completo, pra sempre, sem cobrança.'
   if (!b.enabled) return 'A assinatura ainda não foi aberta. Enquanto isso, o uso do Poupin é gratuito e nada é cobrado.'
-  if (b.status === 'active') return 'Tudo liberado. A cobrança é feita todo mês no seu cartão, pelo Mercado Pago.'
+  if (b.status === 'active') return 'Tudo liberado. A cobrança é feita todo mês no seu cartão.'
   if (b.status === 'prepaid')
     return `Tudo liberado até ${paidUntil(b)} (${b.paid_days_left === 1 ? 'falta 1 dia' : `faltam ${b.paid_days_left} dias`}). Não há renovação automática: pagando de novo, o período novo soma ao que já está pago.`
   if (b.status === 'cancelled') return `Você cancelou, e o acesso continua até ${paidUntil(b)}. Dá pra voltar quando quiser.`
@@ -141,7 +141,7 @@ function Plans({ b }: { b: Billing }) {
               <PayRow
                 icon={CreditCard}
                 title={`Cartão em até ${INSTALLMENTS}×`}
-                text={`${INSTALLMENTS} parcelas de ${brl(perMonth)}. O Mercado Pago pode cobrar juros no parcelamento; o valor final aparece antes de você confirmar.`}
+                text={`${INSTALLMENTS} parcelas de ${brl(perMonth)}. As opções de parcelamento do seu cartão aparecem na hora de pagar, antes de você confirmar.`}
                 cta="Pagar no cartão"
                 primary
                 busy={is({ period: 'year', method: 'card' })}
@@ -149,13 +149,13 @@ function Plans({ b }: { b: Billing }) {
                 onClick={() => pay({ period: 'year', method: 'card' })}
               />
               <PayRow
-                icon={QrCode}
-                title="Pix ou boleto, à vista"
-                text={`${brl(b.annual_price_cents)} de uma vez, sem juros.`}
-                cta="Pagar à vista"
-                busy={is({ period: 'year', method: 'pix' })}
+                icon={Barcode}
+                title="Boleto, à vista"
+                text={`${brl(b.annual_price_cents)} de uma vez. O acesso é liberado quando o boleto compensa (até 2 dias úteis).`}
+                cta="Gerar boleto"
+                busy={is({ period: 'year', method: 'boleto' })}
                 disabled={busy !== null}
-                onClick={() => pay({ period: 'year', method: 'pix' })}
+                onClick={() => pay({ period: 'year', method: 'boleto' })}
               />
             </>
           ) : (
@@ -171,20 +171,20 @@ function Plans({ b }: { b: Billing }) {
                 onClick={() => pay({ period: 'month', method: 'card' })}
               />
               <PayRow
-                icon={QrCode}
-                title="Pix ou boleto, mês a mês"
+                icon={Barcode}
+                title="Boleto, mês a mês"
                 text={`${brl(b.price_cents)} por 30 dias. Não renova sozinho: o Poupin avisa quando estiver perto de vencer.`}
                 cta={b.status === 'prepaid' ? 'Pagar mais 30 dias' : 'Pagar 30 dias'}
-                busy={is({ period: 'month', method: 'pix' })}
+                busy={is({ period: 'month', method: 'boleto' })}
                 disabled={busy !== null}
-                onClick={() => pay({ period: 'month', method: 'pix' })}
+                onClick={() => pay({ period: 'month', method: 'boleto' })}
               />
             </>
           )}
         </div>
         <p className="mt-auto flex items-start gap-2 pt-5 text-caption text-muted">
           <ShieldCheck size={16} className="mt-0.5 shrink-0 text-good" />
-          O pagamento é feito na página do Mercado Pago. O Poupin não vê nem guarda os dados do seu cartão.
+          O pagamento é feito na página segura da Stripe. O Poupin não vê nem guarda os dados do seu cartão.
         </p>
       </Panel>
     </div>
@@ -201,7 +201,7 @@ function PayRow({
   disabled,
   onClick,
 }: {
-  icon: typeof QrCode
+  icon: typeof Barcode
   title: string
   text: string
   cta: string
@@ -231,7 +231,7 @@ function ManageCard({ b }: { b: Billing }) {
     <Panel className="p-5 sm:p-7">
       <h3 className="text-lead font-semibold">Plano mensal no cartão</h3>
       <p className="mt-1 text-muted">
-        {brl(b.price_cents)} por mês, cobrados pelo Mercado Pago. Cancelando, o acesso continua até o fim do período já pago
+        {brl(b.price_cents)} por mês, cobrados no seu cartão. Cancelando, o acesso continua até o fim do período já pago
         {b.paid_until && <> ({paidUntil(b)})</>}.
       </p>
       {confirming ? (

@@ -8,9 +8,9 @@ import { navigate } from './router.tsx'
 import { useStore } from './store.tsx'
 import { Button, Emoji, Modal } from './ui.tsx'
 
-export type PayChoice = { period: 'month' | 'year'; method: 'card' | 'pix' }
+export type PayChoice = { period: 'month' | 'year'; method: 'card' | 'boleto' }
 
-/** Leva a pessoa para a página do Mercado Pago, no plano e na forma de pagar escolhidos. */
+/** Leva a pessoa para a página de pagamento da Stripe, no plano e na forma de pagar escolhidos. */
 export const useCheckout = () => {
   const { notify } = useStore()
   const [busy, setBusy] = useState<string | null>(null)

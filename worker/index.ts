@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { AppState, User } from '../shared/types.ts'
-import { applyPayment, billingFor, cancelPreapproval, cardCheckout, handleWebhook, oneOffCheckout, syncPreapproval, trialEnd, validWebhook } from './billing.ts'
+import { billingFor, cancelAtPeriodEnd, cancelNow, createCheckout, handleWebhook, syncSession, syncSubscription, trialEnd, validWebhook } from './billing.ts'
 import type { BillingEnv, PlanRow } from './billing.ts'
 import { emailEnabled, sendEmail } from './email.ts'
 import type { EmailEnv } from './email.ts'
@@ -92,7 +92,7 @@ app.onError((err, c) => {
 app.use('*', async (c, next) => {
   c.header('Cache-Control', 'no-store')
   // CSRF: além do cookie SameSite=Strict, toda escrita precisa vir da própria origem.
-  // (o webhook do Mercado Pago vem de fora e é conferido pela assinatura dele)
+  // (o webhook da Stripe vem de fora e é conferido pela assinatura dele)
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && !c.req.path.endsWith('/billing/webhook')) {
     const origin = c.req.header('Origin')
     if (!origin || new URL(origin).host !== new URL(c.req.url).host)
@@ -252,52 +252,21 @@ app.post('/auth/reset', async (c) => {
   return c.json({ ok: true })
 })
 
-// ---------- aviso de pagamento (Mercado Pago) ----------
+// ---------- aviso de pagamento (Stripe) ----------
 
 app.post('/billing/webhook', async (c) => {
-  if (!c.env.MP_ACCESS_TOKEN) return c.json({ ok: true })
-  const body = (await c.req.json().catch(() => ({}))) as { type?: string; data?: { id?: string | number } }
-  const url = new URL(c.req.url)
-  const type = body.type ?? url.searchParams.get('type') ?? ''
-  const dataId = String(body.data?.id ?? url.searchParams.get('data.id') ?? '')
-  if (!dataId) return c.json({ ok: true })
-  if (
-    c.env.MP_WEBHOOK_SECRET &&
-    !(await validWebhook(c.env.MP_WEBHOOK_SECRET, c.req.header('x-signature'), c.req.header('x-request-id'), dataId))
-  )
+  if (!c.env.STRIPE_SECRET_KEY) return c.json({ ok: true })
+  // a assinatura é calculada sobre o corpo exatamente como chegou
+  const payload = await c.req.text()
+  if (!c.env.STRIPE_WEBHOOK_SECRET || !(await validWebhook(c.env.STRIPE_WEBHOOK_SECRET, c.req.header('Stripe-Signature'), payload)))
     throw new HttpError(401, 'Assinatura inválida.')
   try {
-    await handleWebhook(c.env, type, dataId)
-  } catch {
-    // erro ao consultar o Mercado Pago: responde 503 para ele tentar de novo mais tarde
+    await handleWebhook(c.env, JSON.parse(payload) as Record<string, unknown>)
+  } catch (e) {
+    console.error('webhook', e instanceof Error ? e.message : e)
+    // erro ao processar: responde 503 para a Stripe tentar de novo mais tarde
     throw new HttpError(503, 'Não foi possível processar o aviso agora.')
   }
-  return c.json({ ok: true })
-})
-
-app.post('/auth/login', async (c) => {
-  const b = await readBody(c)
-  const guard = await throttle(c)
-  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
-  const pass = typeof b.password === 'string' ? b.password : ''
-  const user = await c.env.DB.prepare('SELECT id, password_hash, password_salt FROM users WHERE email = ?')
-    .bind(email)
-    .first<{ id: string; password_hash: string; password_salt: string }>()
-  // calcula o hash mesmo sem usuário, pra resposta levar o mesmo tempo
-  const hash = await hashPassword(pass, user?.password_salt ?? '00000000000000000000000000000000')
-  if (!user || !safeEqual(hash, user.password_hash)) {
-    await guard.fail()
-    throw new HttpError(401, 'E-mail ou senha incorretos.')
-  }
-  await startSession(c, user.id)
-  return c.json({ ok: true })
-})
-
-app.post('/auth/logout', async (c) => {
-  const token = getCookie(c, SESSION_COOKIE)
-  if (token)
-    await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run()
-  deleteCookie(c, SESSION_COOKIE, { path: '/' })
   return c.json({ ok: true })
 })
 
@@ -322,50 +291,45 @@ const planRow = (db: D1Database, uid: string) =>
 
 // ---------- assinatura ----------
 
+type BillingUser = { id: string; email: string; stripe_customer_id: string | null; stripe_subscription_id: string | null }
+
 const billingUser = (c: Ctx) =>
-  c.env.DB.prepare('SELECT id, email, mp_preapproval_id FROM users WHERE id = ?')
+  c.env.DB.prepare('SELECT id, email, stripe_customer_id, stripe_subscription_id FROM users WHERE id = ?')
     .bind(c.get('userId'))
-    .first<{ id: string; email: string; mp_preapproval_id: string | null }>()
+    .first<BillingUser>()
 
 const requireBilling = (c: Ctx) => {
-  if (!c.env.MP_ACCESS_TOKEN) throw new HttpError(503, 'A assinatura ainda não está disponível. Tente de novo mais tarde.')
+  if (!c.env.STRIPE_SECRET_KEY) throw new HttpError(503, 'A assinatura ainda não está disponível. Tente de novo mais tarde.')
 }
 
-// Duas formas de pagar; nas duas a pessoa se identifica na página do Mercado Pago.
+// Abre a página de pagamento da Stripe para o plano e a forma escolhidos.
 app.post('/billing/checkout', async (c) => {
   requireBilling(c)
   const b = (await c.req.json().catch(() => ({}))) as Body
-  const origin = new URL(c.req.url).origin
+  const user = await billingUser(c)
+  if (!user) throw new HttpError(404, 'Conta não encontrada.')
+  const period = b.period === 'year' ? 'year' : 'month'
+  const method = b.method === 'boleto' ? 'boleto' : 'card'
   try {
-    const url =
-      b.period !== 'year' && b.method === 'card'
-        ? await cardCheckout(c.env, c.get('userId'), origin) // mensal no cartão, renova sozinho
-        : await oneOffCheckout(c.env, c.get('userId'), origin, b.period === 'year' ? 'year' : 'month') // pagamento de um período
-    return c.json({ url })
+    return c.json({ url: await createCheckout(c.env, user, new URL(c.req.url).origin, period, method) })
   } catch (e) {
-    console.error('checkout', b.method, e instanceof Error ? e.message : e)
+    console.error('checkout', period, method, e instanceof Error ? e.message : e)
     throw new HttpError(503, 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.')
   }
 })
 
-// Ao voltar do Mercado Pago: confere o pagamento sem esperar o aviso automático.
+// Ao voltar da Stripe: confere o pagamento sem esperar o aviso automático.
 app.post('/billing/sync', async (c) => {
-  if (!c.env.MP_ACCESS_TOKEN) return c.json({ ok: true })
+  if (!c.env.STRIPE_SECRET_KEY) return c.json({ ok: true })
   const b = (await c.req.json().catch(() => ({}))) as Body
-  const uid = c.get('userId')
-  const ID = /^[A-Za-z0-9_-]{1,64}$/
   try {
-    if (typeof b.payment_id === 'string' && ID.test(b.payment_id)) await applyPayment(c.env, b.payment_id, uid)
-    else if (typeof b.preapproval_id === 'string' && ID.test(b.preapproval_id)) {
-      // só reivindica uma assinatura que ainda não é de ninguém
-      const taken = await c.env.DB.prepare('SELECT id FROM users WHERE mp_preapproval_id = ?').bind(b.preapproval_id).first<{ id: string }>()
-      if (!taken || taken.id === uid) await syncPreapproval(c.env, b.preapproval_id, uid)
-    } else {
+    if (typeof b.session_id === 'string' && /^cs_[A-Za-z0-9_]{1,200}$/.test(b.session_id)) await syncSession(c.env, b.session_id, c.get('userId'))
+    else {
       const user = await billingUser(c)
-      if (user?.mp_preapproval_id) await syncPreapproval(c.env, user.mp_preapproval_id)
+      if (user?.stripe_subscription_id) await syncSubscription(c.env, user.stripe_subscription_id)
     }
   } catch {
-    // o aviso automático do Mercado Pago ainda vai chegar e resolver
+    // o aviso automático da Stripe ainda vai chegar e resolver
   }
   return c.json({ ok: true })
 })
@@ -373,13 +337,12 @@ app.post('/billing/sync', async (c) => {
 app.post('/billing/cancel', async (c) => {
   requireBilling(c)
   const user = await billingUser(c)
-  if (!user?.mp_preapproval_id) throw new HttpError(404, 'Você não tem uma assinatura ativa.')
+  if (!user?.stripe_subscription_id) throw new HttpError(404, 'Você não tem uma assinatura ativa.')
   try {
-    await cancelPreapproval(c.env, user.mp_preapproval_id)
+    await cancelAtPeriodEnd(c.env, user.stripe_subscription_id)
   } catch {
     throw new HttpError(503, 'Não foi possível cancelar agora. Tente de novo em instantes.')
   }
-  await c.env.DB.prepare("UPDATE users SET plan = 'cancelled' WHERE id = ? AND plan = 'active'").bind(user.id).run()
   return c.json({ ok: true })
 })
 
@@ -390,18 +353,18 @@ app.post('/account/delete', async (c) => {
   const db = c.env.DB
   const uid = c.get('userId')
   const user = await db
-    .prepare('SELECT password_hash, password_salt, mp_preapproval_id, plan FROM users WHERE id = ?')
+    .prepare('SELECT password_hash, password_salt, stripe_subscription_id FROM users WHERE id = ?')
     .bind(uid)
-    .first<{ password_hash: string; password_salt: string; mp_preapproval_id: string | null; plan: string }>()
+    .first<{ password_hash: string; password_salt: string; stripe_subscription_id: string | null }>()
   const pass = typeof b.password === 'string' ? b.password : ''
   if (!user || !safeEqual(await hashPassword(pass, user.password_salt), user.password_hash))
     throw new HttpError(403, 'Senha incorreta.')
   // não deixa uma cobrança correndo para uma conta que não existe mais
-  if (c.env.MP_ACCESS_TOKEN && user.mp_preapproval_id && user.plan === 'active') {
+  if (c.env.STRIPE_SECRET_KEY && user.stripe_subscription_id) {
     try {
-      await cancelPreapproval(c.env, user.mp_preapproval_id)
+      await cancelNow(c.env, user.stripe_subscription_id)
     } catch {
-      throw new HttpError(503, 'Não foi possível cancelar sua assinatura no Mercado Pago. Tente de novo em instantes.')
+      throw new HttpError(503, 'Não foi possível cancelar sua assinatura. Tente de novo em instantes.')
     }
   }
   await db.batch([
@@ -413,7 +376,7 @@ app.post('/account/delete', async (c) => {
     db.prepare('DELETE FROM purchases WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM cards WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(uid),
-    db.prepare('DELETE FROM mp_payments WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM billing_payments WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM users WHERE id = ?').bind(uid),
   ])

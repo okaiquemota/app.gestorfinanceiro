@@ -403,7 +403,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                 )}
                 <p className="mt-4 max-w-lg text-lg font-medium text-muted">
                   {plan.billing_enabled
-                    ? `Ou ${brl(plan.annual_price_cents)} no plano anual, em até 12× no cartão. Os primeiros ${plan.trial_days} dias são grátis, e você paga por Pix, cartão ou boleto pelo Mercado Pago.`
+                    ? `Ou ${brl(plan.annual_price_cents)} no plano anual, em até 12× no cartão. Os primeiros ${plan.trial_days} dias são grátis, e você paga com cartão ou boleto.`
                     : `A assinatura ainda não foi aberta. Enquanto isso, o uso é gratuito e tem tudo liberado.`}
                 </p>
               </div>
@@ -494,13 +494,13 @@ export function Terms({ plan, authenticated }: { plan: PublicPlan; authenticated
         <h2>3. Teste grátis e assinatura</h2>
         <p>
           Toda conta nova tem {plan.trial_days} dias de teste gratuito, sem necessidade de informar meio de pagamento. Ao fim
-          do teste, para continuar cadastrando e alterando dados é preciso pagar o plano mensal, por meio do Mercado Pago, no
+          do teste, para continuar cadastrando e alterando dados é preciso pagar o plano mensal, por meio da Stripe, no
           valor informado na página de preços no momento da contratação.
         </p>
         <p>
           Há duas formas de pagar. No cartão de crédito, a assinatura se renova automaticamente a cada mês até ser cancelada;
           você pode cancelar a qualquer momento nos Ajustes, o acesso continua até o fim do período já pago e não há multa. Por
-          Pix ou boleto, cada pagamento libera 30 dias de uso e não há renovação automática: para continuar, é preciso pagar
+          boleto, cada pagamento libera 30 dias de uso e não há renovação automática: para continuar, é preciso pagar
           de novo. Sem período pago em vigor, a conta fica disponível apenas para consulta e exportação dos dados.
         </p>
         <p>
@@ -579,8 +579,8 @@ export function Privacy({ authenticated }: { authenticated?: boolean }) {
             número completo de cartão, senha de banco nem acesso à sua conta bancária.
           </li>
           <li>
-            <strong className="text-fg">Assinatura:</strong> situação do plano e identificador da assinatura no Mercado Pago.
-            Os dados de pagamento (cartão, Pix, boleto) são informados diretamente ao Mercado Pago e não passam por nós.
+            <strong className="text-fg">Assinatura:</strong> situação do plano e identificadores do cliente e da assinatura na Stripe.
+            Os dados de pagamento (cartão, boleto) são informados diretamente à Stripe e não passam por nós.
           </li>
           <li>
             <strong className="text-fg">Dados técnicos:</strong> endereço IP, usado para limitar tentativas de login e proteger
@@ -605,7 +605,7 @@ export function Privacy({ authenticated }: { authenticated?: boolean }) {
             <strong className="text-fg">Cloudflare:</strong> hospedagem do aplicativo e do banco de dados.
           </li>
           <li>
-            <strong className="text-fg">Mercado Pago:</strong> processamento dos pagamentos da assinatura.
+            <strong className="text-fg">Stripe:</strong> processamento dos pagamentos da assinatura.
           </li>
           <li>
             <strong className="text-fg">Resend:</strong> envio dos e-mails do serviço.

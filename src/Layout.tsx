@@ -415,25 +415,21 @@ export function Layout({ children }: { children: ReactNode }) {
   const path = usePath()
   const { toast, dismissToast, state, celebrate, celebration, notify } = useStore()
 
-  // Voltando do Mercado Pago (em qualquer tela): confere o pagamento sem esperar
-  // o aviso automático, e leva a pessoa pra tela de assinatura.
+  // Voltando da página de pagamento (em qualquer tela): confere o pagamento sem
+  // esperar o aviso automático, e leva a pessoa pra tela de assinatura.
   const { reload } = useStore()
   useEffect(() => {
     const q = new URLSearchParams(window.location.search)
-    if (!q.has('assinatura') && !q.has('pagamento')) return
+    if (!q.has('pagamento')) return
     window.history.replaceState(null, '', '/assinatura')
     navigate('/assinatura')
-    const status = q.get('status') ?? q.get('collection_status')
-    api('POST', '/billing/sync', {
-      payment_id: q.get('payment_id') ?? q.get('collection_id') ?? undefined,
-      preapproval_id: q.get('preapproval_id') ?? undefined,
-    })
+    api('POST', '/billing/sync', { session_id: q.get('session_id') ?? undefined })
       .then(reload)
-      .then(() => {
-        if (status === 'pending' || status === 'in_process')
-          notify('Pagamento em análise. Assim que for aprovado, seu acesso é liberado sozinho.', 'success')
-        else if (status === 'rejected' || status === 'null') notify('O pagamento não foi concluído. Você pode tentar de novo.')
-        else notify('Tudo certo! Sua assinatura foi atualizada.', 'success')
+      .then(() => api<{ user: { billing: { status: string } } }>('GET', '/state'))
+      .then((s) => {
+        const st = s.user.billing.status
+        if (st === 'active' || st === 'prepaid') notify('Tudo certo! Seu plano está ativo.', 'success')
+        else notify('Pedido recebido. Assim que o pagamento for confirmado, seu acesso é liberado sozinho.', 'success')
       })
       .catch(() => {})
   }, [reload, notify])

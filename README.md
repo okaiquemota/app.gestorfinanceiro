@@ -60,13 +60,13 @@ Qualquer pessoa pode criar conta. Cada conta nova ganha um teste grátis; depois
 
 | O quê | Onde | Para quê |
 |---|---|---|
-| `PLAN_PRICE_CENTS`, `TRIAL_DAYS` | `vars` em `wrangler.jsonc` | Preço mensal em centavos e dias de teste |
-| `MP_ACCESS_TOKEN` | `npx wrangler secret put MP_ACCESS_TOKEN` | Liga a cobrança pelo Mercado Pago. Sem ele ninguém é cobrado nem bloqueado |
-| `MP_WEBHOOK_SECRET` | `npx wrangler secret put MP_WEBHOOK_SECRET` | Confere a assinatura dos avisos de pagamento |
+| `PLAN_PRICE_CENTS`, `ANNUAL_PRICE_CENTS`, `TRIAL_DAYS` | `vars` em `wrangler.jsonc` | Preço mensal e anual em centavos e dias de teste |
+| `STRIPE_SECRET_KEY` | `npx wrangler secret put STRIPE_SECRET_KEY` | Liga a cobrança pela Stripe (chave secreta `sk_…`). Sem ele ninguém é cobrado nem bloqueado |
+| `STRIPE_WEBHOOK_SECRET` | `npx wrangler secret put STRIPE_WEBHOOK_SECRET` | Segredo `whsec_…` do webhook. Confere a assinatura dos avisos de pagamento |
 | `RESEND_API_KEY`, `EMAIL_FROM` | `npx wrangler secret put …` | Envio do e-mail de recuperação de senha (exige domínio próprio verificado no Resend) |
 | Dados do responsável | `src/lib/site.ts` | Nome, CPF/CNPJ, e-mail de contato e foro, usados nos termos e na política de privacidade |
 
-No painel do Mercado Pago, o endereço de webhook é `https://poupin.okaiquemota.workers.dev/api/billing/webhook`, com os eventos de assinatura ("Planos e assinaturas").
+No painel da Stripe (Desenvolvedores → Webhooks), o endereço é `https://poupin.okaiquemota.workers.dev/api/billing/webhook`, com os eventos `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated` e `customer.subscription.deleted`. Em Configurações → Formas de pagamento, ative cartão e boleto.
 
 Os termos de uso e a política de privacidade (`src/pages/Public.tsx`) são um ponto de partida e precisam de revisão jurídica antes da divulgação.
 
