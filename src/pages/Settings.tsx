@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, Download, LogOut } from 'lucide-react'
-import { PayerEmail, useCheckout, planLabel } from '../Paywall.tsx'
+import { PayOptions, planLabel } from '../Paywall.tsx'
 import { api } from '../lib/api.ts'
 import { brl } from '../lib/format.ts'
 import { playCoin, setSoundOn, soundOn } from '../lib/fun.ts'
@@ -157,17 +157,24 @@ export function Settings() {
 
 function PlanPanel() {
   const { state, run, reload, notify } = useStore()
-  const { busy, start, email, setEmail } = useCheckout()
   const [confirming, setConfirming] = useState(false)
   const b = state.user.billing
 
-  // voltando do Mercado Pago: confere a assinatura sem esperar o aviso automático
+  // Voltando do Mercado Pago: confere o pagamento sem esperar o aviso automático.
   useEffect(() => {
-    if (!new URLSearchParams(window.location.search).has('assinatura')) return
+    const q = new URLSearchParams(window.location.search)
+    if (!q.has('assinatura') && !q.has('pagamento')) return
     window.history.replaceState(null, '', '/ajustes')
-    api('POST', '/billing/sync')
+    const payment = q.get('payment_id') ?? q.get('collection_id')
+    const status = q.get('status') ?? q.get('collection_status')
+    api('POST', '/billing/sync', { payment_id: payment ?? undefined, preapproval_id: q.get('preapproval_id') ?? undefined })
       .then(reload)
-      .then(() => notify('Pagamento recebido? A situação da assinatura foi atualizada.', 'success'))
+      .then(() => {
+        if (status === 'pending' || status === 'in_process')
+          notify('Pagamento em análise. Assim que for aprovado, seu acesso é liberado sozinho.', 'success')
+        else if (status === 'rejected' || status === 'null') notify('O pagamento não foi concluído. Você pode tentar de novo.')
+        else notify('Tudo certo! A situação da sua assinatura foi atualizada.', 'success')
+      })
       .catch(() => {})
   }, [reload, notify])
 
@@ -187,7 +194,8 @@ function PlanPanel() {
       ) : b.status === 'active' ? (
         <>
           <p className="mt-2 text-caption text-muted">
-            {brl(b.price_cents)} por mês, cobrados pelo Mercado Pago. Cancelando, o acesso continua até o fim do período já pago.
+            {brl(b.price_cents)} por mês no cartão, cobrados pelo Mercado Pago. Cancelando, o acesso continua até o fim do período
+            já pago.
           </p>
           {confirming ? (
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -213,25 +221,16 @@ function PlanPanel() {
         </>
       ) : (
         <>
-          <p className="mt-2 text-caption text-muted">
+          <p className="mb-4 mt-2 text-caption text-muted">
             {b.status === 'trial'
-              ? `Depois do teste, o Poupin custa ${brl(b.price_cents)} por mês. Você pode assinar agora ou quando o teste acabar.`
-              : b.status === 'cancelled'
-                ? 'Você pode reativar a assinatura quando quiser.'
-                : `Assine por ${brl(b.price_cents)} por mês pra voltar a lançar e editar. Seus dados continuam aqui.`}
+              ? 'Você pode pagar agora ou quando o teste acabar. Escolha como:'
+              : b.status === 'prepaid'
+                ? `Seu acesso vai até ${planLabel(b).replace('Pago até ', '')} (${b.paid_days_left === 1 ? 'falta 1 dia' : `faltam ${b.paid_days_left} dias`}). Pagando agora, os 30 dias novos somam ao que já está pago.`
+                : b.status === 'cancelled'
+                  ? 'Você pode voltar quando quiser. Escolha como pagar:'
+                  : 'Seus dados continuam aqui. Pra voltar a lançar e editar, escolha como pagar:'}
           </p>
-          <form
-            className="mt-4 space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault()
-              start()
-            }}
-          >
-            <PayerEmail email={email} setEmail={setEmail} />
-            <Button type="submit" variant="primary" disabled={busy} aria-busy={busy}>
-              {busy ? 'Abrindo…' : 'Assinar pelo Mercado Pago'}
-            </Button>
-          </form>
+          <PayOptions price={b.price_cents} renew={b.status === 'prepaid'} />
         </>
       )}
     </Panel>

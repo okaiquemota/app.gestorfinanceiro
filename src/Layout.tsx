@@ -17,6 +17,7 @@ import {
   Sun,
 } from 'lucide-react'
 import { addMonths } from '../shared/finance.ts'
+import type { Billing } from '../shared/types.ts'
 import { currentMonth, monthNames, monthParts, monthTitle } from './lib/format.ts'
 import { achievements, newlyUnlocked, streak } from './lib/fun.ts'
 import { planLabel } from './Paywall.tsx'
@@ -91,6 +92,15 @@ function ThemeSwitch() {
   )
 }
 
+/** Texto do lembrete do plano no menu, ou null quando não há o que lembrar. */
+const billingNudge = (b: Billing): string | null => {
+  if (!b.enabled) return null
+  if (b.status === 'trial' || b.status === 'expired') return planLabel(b)
+  if ((b.status === 'prepaid' || b.status === 'cancelled') && b.paid_days_left <= 5)
+    return b.paid_days_left === 1 ? 'Seu acesso vence amanhã' : `Seu acesso vence em ${b.paid_days_left} dias`
+  return null
+}
+
 function Sidebar({ path }: { path: string }) {
   const { state } = useStore()
   return (
@@ -118,8 +128,9 @@ function Sidebar({ path }: { path: string }) {
       </nav>
 
       <div className="mt-auto">
-        {/* teste grátis ou teste encerrado: lembrete discreto, com o caminho pra assinar */}
-        {(state.user.billing.status === 'trial' || state.user.billing.status === 'expired') && state.user.billing.enabled && (
+        {/* lembrete discreto do plano, com o caminho pra pagar: teste correndo,
+            acesso vencido, ou mês a mês/cancelado chegando ao fim */}
+        {billingNudge(state.user.billing) && (
           <Link
             href="/ajustes"
             className={cx(
@@ -127,7 +138,7 @@ function Sidebar({ path }: { path: string }) {
               state.user.billing.status === 'expired' ? 'bg-bad-soft text-bad' : 'bg-primary-soft text-accent',
             )}
           >
-            {planLabel(state.user.billing)}
+            {billingNudge(state.user.billing)}
             <span className="block font-normal text-muted">Ver assinatura</span>
           </Link>
         )}

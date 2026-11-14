@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { AppState, User } from '../shared/types.ts'
-import { billingFor, cancelPreapproval, createCheckout, handleWebhook, syncPreapproval, trialEnd, validWebhook } from './billing.ts'
+import { applyPayment, billingFor, cancelPreapproval, cardCheckout, handleWebhook, oneOffCheckout, syncPreapproval, trialEnd, validWebhook } from './billing.ts'
 import type { BillingEnv, PlanRow } from './billing.ts'
 import { emailEnabled, sendEmail } from './email.ts'
 import type { EmailEnv } from './email.ts'
@@ -331,29 +331,41 @@ const requireBilling = (c: Ctx) => {
   if (!c.env.MP_ACCESS_TOKEN) throw new HttpError(503, 'A assinatura ainda não está disponível. Tente de novo mais tarde.')
 }
 
+// Duas formas de pagar; nas duas a pessoa se identifica na página do Mercado Pago.
 app.post('/billing/checkout', async (c) => {
   requireBilling(c)
-  const user = await billingUser(c)
-  if (!user) throw new HttpError(404, 'Conta não encontrada.')
-  // O Mercado Pago exige o e-mail da conta de quem paga, que nem sempre é o do Poupin.
   const b = (await c.req.json().catch(() => ({}))) as Body
-  const payer = typeof b.payer_email === 'string' && b.payer_email.trim() ? b.payer_email.trim().toLowerCase() : user.email
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payer) || payer.length > 200) throw new HttpError(400, 'E-mail do Mercado Pago inválido.')
+  const origin = new URL(c.req.url).origin
   try {
-    return c.json({ url: await createCheckout(c.env, user, new URL(c.req.url).origin, payer) })
-  } catch (e) {
-    // recusa ligada a quem paga: quase sempre é o e-mail que não bate com a conta do Mercado Pago
-    // ("User bad request" é o que ele responde quando o e-mail não é de nenhuma conta dele)
-    if (e instanceof Error && /payer|collector|user bad request/i.test(e.message))
-      throw new HttpError(400, 'O Mercado Pago não encontrou uma conta com esse e-mail. Use o e-mail com que você entra no Mercado Pago.')
+    const url =
+      b.method === 'card'
+        ? await cardCheckout(c.env, c.get('userId'), origin) // cartão, renova sozinho
+        : await oneOffCheckout(c.env, c.get('userId'), origin) // Pix, boleto ou cartão: 30 dias
+    return c.json({ url })
+  } catch {
     throw new HttpError(503, 'Não foi possível abrir o pagamento agora. Tente de novo em instantes.')
   }
 })
 
-// Ao voltar do Mercado Pago: confere a assinatura sem esperar o aviso automático.
+// Ao voltar do Mercado Pago: confere o pagamento sem esperar o aviso automático.
 app.post('/billing/sync', async (c) => {
-  const user = await billingUser(c)
-  if (c.env.MP_ACCESS_TOKEN && user?.mp_preapproval_id) await syncPreapproval(c.env, user.mp_preapproval_id).catch(() => {})
+  if (!c.env.MP_ACCESS_TOKEN) return c.json({ ok: true })
+  const b = (await c.req.json().catch(() => ({}))) as Body
+  const uid = c.get('userId')
+  const ID = /^[A-Za-z0-9_-]{1,64}$/
+  try {
+    if (typeof b.payment_id === 'string' && ID.test(b.payment_id)) await applyPayment(c.env, b.payment_id, uid)
+    else if (typeof b.preapproval_id === 'string' && ID.test(b.preapproval_id)) {
+      // só reivindica uma assinatura que ainda não é de ninguém
+      const taken = await c.env.DB.prepare('SELECT id FROM users WHERE mp_preapproval_id = ?').bind(b.preapproval_id).first<{ id: string }>()
+      if (!taken || taken.id === uid) await syncPreapproval(c.env, b.preapproval_id, uid)
+    } else {
+      const user = await billingUser(c)
+      if (user?.mp_preapproval_id) await syncPreapproval(c.env, user.mp_preapproval_id)
+    }
+  } catch {
+    // o aviso automático do Mercado Pago ainda vai chegar e resolver
+  }
   return c.json({ ok: true })
 })
 
@@ -400,6 +412,7 @@ app.post('/account/delete', async (c) => {
     db.prepare('DELETE FROM purchases WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM cards WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM mp_payments WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM users WHERE id = ?').bind(uid),
   ])

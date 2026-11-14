@@ -494,13 +494,14 @@ export function Terms({ plan, authenticated }: { plan: PublicPlan; authenticated
         <h2>3. Teste grátis e assinatura</h2>
         <p>
           Toda conta nova tem {plan.trial_days} dias de teste gratuito, sem necessidade de informar meio de pagamento. Ao fim
-          do teste, para continuar cadastrando e alterando dados é preciso assinar o plano mensal, cobrado por meio do Mercado
-          Pago no valor informado na página de preços no momento da contratação.
+          do teste, para continuar cadastrando e alterando dados é preciso pagar o plano mensal, por meio do Mercado Pago, no
+          valor informado na página de preços no momento da contratação.
         </p>
         <p>
-          A assinatura se renova automaticamente a cada mês até ser cancelada. Você pode cancelar a qualquer momento nos
-          Ajustes; o acesso continua até o fim do período já pago e não há cobrança de multa. Sem assinatura ativa, a conta
-          fica disponível apenas para consulta e exportação dos dados.
+          Há duas formas de pagar. No cartão de crédito, a assinatura se renova automaticamente a cada mês até ser cancelada;
+          você pode cancelar a qualquer momento nos Ajustes, o acesso continua até o fim do período já pago e não há multa. Por
+          Pix ou boleto, cada pagamento libera 30 dias de uso e não há renovação automática: para continuar, é preciso pagar
+          de novo. Sem período pago em vigor, a conta fica disponível apenas para consulta e exportação dos dados.
         </p>
         <p>
           Em contratações feitas pela internet você pode desistir em até 7 dias a contar da contratação, com devolução do
