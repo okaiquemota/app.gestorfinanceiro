@@ -24,8 +24,8 @@ export function Income() {
   const add = () => openForm({ type: 'entry', kind: 'income' })
 
   return (
-    <div className="fit-grid grid gap-4 xl:grid-cols-[minmax(0,1fr)_392px] fit:h-full">
-      <Panel className="fit-scroll p-5 sm:p-6">
+    <div className="fit-grid fit:h-full grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_392px]">
+      <Panel className="fit-scroll p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lead font-semibold">Minha renda</h2>
@@ -72,7 +72,7 @@ export function Income() {
         )}
       </Panel>
 
-      <Panel className="fit-scroll self-start p-5 sm:p-6 fit:max-h-full">
+      <Panel className="fit-scroll fit:max-h-full self-start p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lead font-semibold">Dia a dia</h2>

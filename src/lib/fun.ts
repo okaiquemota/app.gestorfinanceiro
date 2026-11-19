@@ -50,6 +50,8 @@ const note = (freq: number, at: number, length: number, volume = 0.07) => {
 
 const buzz = (pattern: number | number[]) => {
   try {
+    // o navegador só deixa vibrar logo depois de um toque; fora disso, nem tenta
+    if (navigator.userActivation && !navigator.userActivation.isActive) return
     navigator.vibrate?.(pattern)
   } catch {
     // sem vibração neste aparelho
@@ -161,17 +163,17 @@ export const achievements = (state: AppState): Achievement[] => {
   ]
 }
 
-const SEEN_KEY = 'gf-conquistas'
-
-/** Conquistas que acabaram de ser desbloqueadas desde a última vez neste aparelho. */
-export const newlyUnlocked = (list: Achievement[]): Achievement[] => {
+/** Conquistas que acabaram de ser desbloqueadas desde a última vez neste aparelho (por conta). */
+export const newlyUnlocked = (userId: string, list: Achievement[]): Achievement[] => {
+  const key = `gf-conquistas:${userId}`
   const done = list.filter((a) => a.done)
   try {
-    const raw = localStorage.getItem(SEEN_KEY)
-    localStorage.setItem(SEEN_KEY, JSON.stringify(done.map((a) => a.id)))
+    const raw = localStorage.getItem(key)
+    localStorage.setItem(key, JSON.stringify(done.map((a) => a.id)))
     // primeira vez: só registra, sem comemorar tudo de uma vez
     if (raw === null) return []
-    const seen = new Set(JSON.parse(raw) as string[])
+    const parsed: unknown = JSON.parse(raw)
+    const seen = new Set(Array.isArray(parsed) ? parsed : [])
     return done.filter((a) => !seen.has(a.id))
   } catch {
     return []

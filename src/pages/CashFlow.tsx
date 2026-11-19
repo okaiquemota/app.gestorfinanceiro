@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { addMonths, summarize } from '../../shared/finance.ts'
-import { brl, brlShort, monthLong, monthLongTitle, monthShort } from '../lib/format.ts'
+import { brl, brlRound, brlShort, monthLong, monthLongTitle, monthShort } from '../lib/format.ts'
 import { navigate } from '../router.tsx'
 import { useStore } from '../store.tsx'
 import { Amount, Money, Panel, cx } from '../ui.tsx'
@@ -55,24 +55,24 @@ export function CashFlow() {
   }
 
   return (
-    <div className="fit-page space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Panel className="p-5">
+    <div className="fit-page space-y-3 sm:space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <Panel className="col-span-2 p-4 sm:col-span-1 sm:p-5">
           <p className="text-caption text-muted">Sobra somada em {MONTHS} meses</p>
           <Money cents={total} className={cx('mt-1', total < 0 && 'text-bad')} />
         </Panel>
-        <Panel className="p-5">
+        <Panel className="p-4 sm:p-5">
           <p className="text-caption text-muted">Mês mais apertado</p>
-          <Money cents={tight.leftover} className={cx('mt-1', tight.leftover < 0 && 'text-bad')} />
+          <Money cents={tight.leftover} size="stat" className={cx('mt-1', tight.leftover < 0 && 'text-bad')} />
           <p className="mt-1 text-caption text-muted">{monthLong(tight.month)}</p>
         </Panel>
-        <Panel className="p-5">
-          <p className="text-caption text-muted">Média de saídas por mês</p>
-          <Money cents={avgOut} className="mt-1" />
+        <Panel className="p-4 sm:p-5">
+          <p className="text-caption text-muted">Média de saídas<span className="max-sm:hidden"> por mês</span></p>
+          <Money cents={avgOut} size="stat" className="mt-1" />
         </Panel>
       </div>
 
-      <Panel className="p-5 sm:p-6">
+      <Panel className="p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lead font-semibold">
             Entradas e saídas previstas <span className="font-normal text-muted sm:hidden">· 6 meses</span>
@@ -88,14 +88,14 @@ export function CashFlow() {
         </div>
 
         <div className="mt-5 flex gap-2">
-          <div className="tnum flex h-56 w-14 shrink-0 flex-col justify-between text-right text-micro text-faint" aria-hidden>
+          <div className="tnum flex h-44 sm:h-56 w-14 shrink-0 flex-col justify-between text-right text-micro text-faint" aria-hidden>
             {ticks.map((t) => (
               <span key={t} className="-translate-y-1/2 leading-none">
                 {brlShort(top * t)}
               </span>
             ))}
           </div>
-          <div className="relative h-56 min-w-0 flex-1" onMouseLeave={() => setHover(null)}>
+          <div className="relative h-44 sm:h-56 min-w-0 flex-1" onMouseLeave={() => setHover(null)}>
             {ticks.map((t) => (
               <span
                 key={t}
@@ -164,19 +164,19 @@ export function CashFlow() {
       </Panel>
 
       <Panel className="fit-grow fit-scroll overflow-hidden">
-        <h2 className="px-5 pt-5 text-lead font-semibold sm:px-6">Mês a mês</h2>
-        <p className="px-5 text-caption text-muted sm:px-6">Toque no mês pra abrir ele na visão geral.</p>
+        <h2 className="px-4 pt-4 text-lead font-semibold sm:px-6 sm:pt-5">Mês a mês</h2>
+        <p className="px-4 text-caption text-muted sm:px-6">Toque no mês pra abrir ele na visão geral.</p>
         <div className="mt-3 overflow-x-auto">
           <table className="tnum w-full whitespace-nowrap text-right text-caption md:min-w-[680px]">
             <thead>
               <tr className="border-b border-line text-xs text-muted">
-                <th className="px-5 py-2 text-left font-semibold sm:px-6">Mês</th>
+                <th className="px-4 py-2 text-left font-semibold sm:px-6">Mês</th>
                 <th className="px-2 py-2 font-semibold sm:px-3">Renda</th>
                 <th className="px-2 py-2 font-semibold sm:px-3 md:hidden">Saídas</th>
                 <th className="px-2 py-2 font-semibold sm:px-3 max-md:hidden">Contas</th>
                 <th className="px-2 py-2 font-semibold sm:px-3 max-md:hidden">Cartões</th>
                 <th className="px-2 py-2 font-semibold sm:px-3 max-md:hidden">Dia a dia</th>
-                <th className="px-2 py-2 font-semibold max-sm:pr-5 sm:px-3">Sobra</th>
+                <th className="px-2 py-2 font-semibold max-sm:pr-4 sm:px-3">Sobra</th>
                 <th className="px-5 py-2 font-semibold max-sm:hidden sm:px-6">Acumulado</th>
               </tr>
             </thead>
@@ -194,13 +194,13 @@ export function CashFlow() {
                       <ChevronRight size={14} />
                     </button>
                   </th>
-                  <td className="px-2 py-2.5 sm:px-3">{brl(r.income)}</td>
-                  <td className="px-2 py-2.5 sm:px-3 text-muted md:hidden">{brl(r.expenses)}</td>
+                  <td className="px-2 py-2.5 sm:px-3"><Brl cents={r.income} /></td>
+                  <td className="px-2 py-2.5 sm:px-3 text-muted md:hidden"><Brl cents={r.expenses} /></td>
                   <td className="px-2 py-2.5 sm:px-3 text-muted max-md:hidden">{brl(r.housing + r.bills + r.savings)}</td>
                   <td className="px-2 py-2.5 sm:px-3 text-muted max-md:hidden">{brl(r.cards)}</td>
                   <td className="px-2 py-2.5 sm:px-3 text-muted max-md:hidden">{brl(r.daily)}</td>
-                  <td className={cx('px-2 py-2.5 font-semibold max-sm:pr-5 sm:px-3', r.leftover < 0 ? 'text-bad' : 'text-good')}>
-                    {brl(r.leftover)}
+                  <td className={cx('px-2 py-2.5 font-semibold max-sm:pr-4 sm:px-3', r.leftover < 0 ? 'text-bad' : 'text-good')}>
+                    <Brl cents={r.leftover} />
                   </td>
                   <td className={cx('px-5 py-2.5 font-semibold max-sm:hidden sm:px-6', r.acc < 0 && 'text-bad')}>{brl(r.acc)}</td>
                 </tr>
@@ -210,5 +210,15 @@ export function CashFlow() {
         </div>
       </Panel>
     </div>
+  )
+}
+
+/** Valor da tabela: arredondado ao real no celular (cabe sem rolar de lado), completo a partir do tablet. */
+function Brl({ cents }: { cents: number }) {
+  return (
+    <>
+      <span className="sm:hidden">{brlRound(cents)}</span>
+      <span className="max-sm:hidden">{brl(cents)}</span>
+    </>
   )
 }
