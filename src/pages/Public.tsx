@@ -265,15 +265,13 @@ function Walker({
     targets[line.spot].current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [desktop, line.spot, targets])
 
-  const bubble = (
+  /** Balão de fala: cauda apontando pro Poupin, do lado em que ele está. */
+  const bubble = (tail: 'l' | 'r', low?: boolean) => (
     <div
       key={String(line.spot) + String(typeof line.text === 'string' ? line.text : '')}
       role="status"
       aria-live="polite"
-      className={cx(
-        'bubble-in rounded-2xl border border-line bg-surface p-4 leading-snug shadow-pop',
-        SPOTS[line.spot].big ? 'rounded-bl-md p-5 text-lg' : 'text-[15px]',
-      )}
+      className={cx('speech bubble-in', `tail-${tail}`, low && 'tail-low', SPOTS[line.spot].big ? 'px-6 py-5 text-lg' : 'px-5 py-4 text-[15px]')}
     >
       <div className="font-medium">{line.text}</div>
       {line.actions && <div className="mt-3 flex flex-wrap items-center gap-2">{line.actions}</div>}
@@ -299,7 +297,7 @@ function Walker({
   if (!desktop)
     return (
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex items-end gap-1 px-3 pb-3">
-        <div className="pointer-events-auto min-w-0 flex-1 pb-2">{bubble}</div>
+        <div className="pointer-events-auto min-w-0 flex-1 pb-3 pr-2">{bubble('r', true)}</div>
         <div className="w-[92px] shrink-0 [&_img]:!h-auto [&_img]:!w-[92px]">{body}</div>
       </div>
     )
@@ -317,11 +315,11 @@ function Walker({
       <div
         className={cx(
           'pointer-events-auto absolute w-[300px]',
-          cfg.big ? 'bottom-[235px] left-[210px] w-[360px]' : cfg.up ? 'bottom-6' : 'top-2',
-          !cfg.big && (bubbleOnLeft ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]'),
+          cfg.big ? 'bottom-[235px] left-[225px] w-[360px]' : cfg.up ? 'bottom-6' : 'top-2',
+          !cfg.big && (bubbleOnLeft ? 'right-[calc(100%+6px)]' : 'left-[calc(100%+6px)]'),
         )}
       >
-        {bubble}
+        {bubble(cfg.big || !bubbleOnLeft ? 'l' : 'r', cfg.big || cfg.up)}
       </div>
     </div>
   )
@@ -704,7 +702,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
             </div>
 
             {!desktop && step === 0 && !reaction && (
-              <div role="status" aria-live="polite" className="bubble-in relative z-10 -mt-2 w-full max-w-sm rounded-2xl border border-line bg-surface p-4 text-[16px] font-medium leading-snug shadow-pop">
+              <div role="status" aria-live="polite" className="speech tail-u bubble-in relative z-10 mt-2 w-full max-w-sm px-5 py-4 text-[16px] font-medium">
                 {line.text}
                 {line.actions && <div className="mt-3 flex flex-wrap items-center gap-2">{line.actions}</div>}
               </div>
