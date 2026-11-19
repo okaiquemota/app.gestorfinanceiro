@@ -123,7 +123,8 @@ export const createCheckout = async (
     locale: 'pt-BR',
     success_url: `${origin}/assinatura?pagamento=retorno&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/assinatura`,
-    payment_method_types: [method],
+    // as formas de pagamento ligadas ficam no painel da Stripe; aqui só tiramos a outra opção
+    excluded_payment_method_types: [method === 'card' ? 'boleto' : 'card'],
     line_items: [
       {
         quantity: 1,
