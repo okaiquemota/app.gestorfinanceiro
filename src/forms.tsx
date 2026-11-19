@@ -10,9 +10,9 @@ import {
   occurrences,
   toISODate,
 } from '../shared/finance.ts'
-import type { Card, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
+import type { Card, Challenge, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { api } from './lib/api.ts'
-import { CARD_COLORS, CATEGORIES, GOAL_ICONS, GOAL_ICON_LABELS, category } from './lib/categories.ts'
+import { CARD_COLORS, CATEGORIES, CHALLENGE_ICONS, CHALLENGE_ICON_LABELS, GOAL_ICONS, GOAL_ICON_LABELS, category } from './lib/categories.ts'
 import { brl, dayMonth, monthLong, monthLower, monthTitle } from './lib/format.ts'
 import { useStore } from './store.tsx'
 import {
@@ -50,6 +50,8 @@ export function FormHost() {
       return <GoalForm goal={form.goal} />
     case 'move':
       return <MoveForm {...form} />
+    case 'challenge':
+      return <ChallengeForm challenge={form.challenge} />
   }
 }
 
@@ -832,6 +834,110 @@ function MoveForm({ goalId, direction }: { goalId: string; direction: 'in' | 'ou
       <Field label="Observação (opcional)">
         <TextInput value={note} onChange={(e) => setNote(e.target.value)} maxLength={120} />
       </Field>
+    </Modal>
+  )
+}
+
+// ---------- conquista própria ----------
+
+function ChallengeForm({ challenge }: { challenge?: Challenge }) {
+  const { closeForm, run } = useStore()
+  const { busy, error, submit } = useSubmit()
+  const thisYear = new Date().getFullYear()
+  const [title, setTitle] = useState(challenge?.title ?? '')
+  const [text, setText] = useState(challenge?.text ?? '')
+  const [icon, setIcon] = useState(challenge?.icon ?? 'target')
+  const [hasYear, setHasYear] = useState(challenge ? challenge.year !== null : true)
+  const [year, setYear] = useState(challenge?.year ?? thisYear)
+  const payload = { title, text, icon, year: hasYear ? year : null }
+  const years = [thisYear - 1, thisYear, thisYear + 1, thisYear + 2]
+  if (!years.includes(year)) years.push(year)
+
+  return (
+    <Modal
+      title={challenge ? 'Editar conquista' : 'Nova conquista'}
+      onClose={closeForm}
+      onSubmit={() =>
+        submit(
+          () => (challenge ? api('PUT', `/challenges/${challenge.id}`, payload) : api('POST', '/challenges', payload)),
+          {
+            problem: !title.trim() ? 'Dê um nome pra conquista.' : null,
+            success: challenge ? 'Alterações salvas.' : 'Conquista criada. Agora é correr atrás!',
+          },
+        )
+      }
+      footer={
+        <Footer
+          busy={busy}
+          error={error}
+          deleteQuestion="Excluir esta conquista?"
+          onDelete={
+            challenge ? () => submit(() => api('DELETE', `/challenges/${challenge.id}`), { success: 'Conquista excluída.' }) : undefined
+          }
+        />
+      }
+    >
+      <Field label="Nome">
+        <TextInput
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex.: Quitar o cartão"
+          maxLength={60}
+          autoFocus={!challenge}
+        />
+      </Field>
+      <Field label="Descrição" hint="Opcional. O que precisa acontecer pra contar como feita.">
+        <TextInput
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Ex.: Ficar o ano todo sem pagar juros"
+          maxLength={140}
+        />
+      </Field>
+      <Field label="Ícone" group>
+        <div role="radiogroup" className="grid grid-cols-8 gap-1">
+          {CHALLENGE_ICONS.map((i) => (
+            <button
+              key={i}
+              type="button"
+              role="radio"
+              aria-checked={i === icon}
+              aria-label={CHALLENGE_ICON_LABELS[i] ?? i}
+              title={CHALLENGE_ICON_LABELS[i] ?? i}
+              onClick={() => setIcon(i)}
+              className={cx(
+                'flex aspect-square items-center justify-center rounded-xl border transition-colors',
+                i === icon ? 'border-primary bg-primary-soft' : 'border-transparent hover:bg-sunken',
+              )}
+            >
+              <Emoji name={i} size={28} />
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Toggle checked={hasYear} onChange={setHasYear} label="É um desafio do ano" />
+      {hasYear && (
+        <Field label="Ano" group>
+          <Segmented
+            label="Ano do desafio"
+            value={String(year)}
+            onChange={(v) => setYear(Number(v))}
+            options={years.sort().map((y) => ({ value: String(y), label: String(y) }))}
+          />
+        </Field>
+      )}
+      {challenge && (
+        <Toggle
+          checked={!!challenge.done_at}
+          onChange={(done) => {
+            closeForm()
+            run(() => api('POST', `/challenges/${challenge.id}/done`, { done }), {
+              success: done ? undefined : 'Marcada como não concluída.',
+            })
+          }}
+          label="Já concluí"
+        />
+      )}
     </Modal>
   )
 }

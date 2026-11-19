@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { AppState, Card, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
+import type { AppState, Card, Challenge, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { ApiError, api } from './lib/api.ts'
 import { currentMonth } from './lib/format.ts'
 import { setupSeen } from './Setup.tsx'
@@ -14,6 +14,7 @@ export type FormSpec =
   | { type: 'invoice'; cardId: string; month: string }
   | { type: 'goal'; goal?: Goal }
   | { type: 'move'; goalId: string; direction: 'in' | 'out' }
+  | { type: 'challenge'; challenge?: Challenge }
 
 export type Theme = 'light' | 'dark'
 

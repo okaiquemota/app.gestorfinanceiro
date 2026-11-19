@@ -442,9 +442,10 @@ export function Layout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const fresh = newlyUnlocked(state.user.id, unlocked)
     if (fresh.length === 0) return
-    const title = fresh[fresh.length - 1].title
-    if (partying.current) notify(`Conquista desbloqueada: ${title}`, 'success')
-    else celebrate(`Conquista: ${title}!`)
+    const last = fresh[fresh.length - 1]
+    const label = last.secret ? 'Conquista secreta' : 'Conquista'
+    if (partying.current) notify(`${label} desbloqueada: ${last.title}`, 'success')
+    else celebrate(`${label}: ${last.title}!`)
   }, [unlocked, celebrate, notify, state.user.id])
   const page = PAGE_NAMES[path] ?? 'Visão geral'
   const main = useRef<HTMLElement>(null)

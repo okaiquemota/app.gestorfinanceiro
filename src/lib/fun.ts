@@ -1,7 +1,7 @@
 // A parte divertida do app: som e toque, falas do Poupin, sequência e conquistas.
 // Tudo calculado a partir dos dados que já existem — nada é gravado no servidor.
 
-import { addMonths, dueDate, goalBalance, payables, summarize, toISODate } from '../../shared/finance.ts'
+import { addMonths, dueDate, entryActive, goalBalance, payables, summarize, toISODate } from '../../shared/finance.ts'
 import type { Payable, Summary } from '../../shared/finance.ts'
 import type { AppState } from '../../shared/types.ts'
 import { brl, currentMonth, monthLower, pct } from './format.ts'
@@ -124,7 +124,8 @@ export const streak = (state: AppState): number => {
   return n
 }
 
-export type Achievement = { id: string; title: string; text: string; emoji: string; done: boolean }
+/** `secret`: fica escondida ("???") até ser conquistada. */
+export type Achievement = { id: string; title: string; text: string; emoji: string; done: boolean; secret?: boolean }
 
 export const achievements = (state: AppState): Achievement[] => {
   const now = currentMonth()
@@ -160,12 +161,70 @@ export const achievements = (state: AppState): Achievement[] => {
     },
     { id: 'azul-3', title: 'Três no azul', text: '3 meses seguidos fechando no azul.', emoji: 'chart-up', done: run >= 3 },
     { id: 'azul-6', title: 'Meio ano no azul', text: '6 meses seguidos fechando no azul.', emoji: 'rocket', done: run >= 6 },
+    ...secretAchievements(state, run),
+  ]
+}
+
+/** As escondidas: só aparecem (nome, ícone e texto) depois de conquistadas. */
+const secretAchievements = (state: AppState, run: number): Achievement[] => {
+  const now = currentMonth()
+  const saved = state.goals.reduce((s, g) => s + Math.max(0, goalBalance(state, g)), 0)
+  const goalsHit = state.goals.filter((g) => g.target_cents > 0 && goalBalance(state, g) >= g.target_cents).length
+  const last12 = Array.from({ length: 12 }, (_, i) => addMonths(now, -i))
+  const monthsAllPaid = last12.filter((m) => {
+    const list = payables(state, m)
+    return list.length > 0 && list.every((p) => p.paid)
+  }).length
+  // um mês já fechado em que sobraram 30% ou mais da renda
+  const thrifty = last12.slice(1).some((m) => {
+    const s = summarize(state, m)
+    return s.income > 0 && s.leftover >= s.income * 0.3
+  })
+  const entryById = new Map(state.entries.map((e) => [e.id, e]))
+  // pagou alguma conta antes do dia do vencimento
+  const early = state.entryMonths.some((om) => {
+    const e = entryById.get(om.entry_id)
+    return !!om.paid_at && !!e && e.kind === 'expense' && om.paid_at.slice(0, 10) < dueDate(om.month, e.due_day)
+  })
+  const incomesNow = state.entries.filter((e) => e.kind === 'income' && entryActive(e, now)).length
+  const done = (id: string, title: string, text: string, emoji: string, ok: boolean): Achievement => ({
+    id,
+    title,
+    text,
+    emoji,
+    done: ok,
+    secret: true,
+  })
+  return [
+    done('cartao', 'Plástico na mão', 'Cadastrou o primeiro cartão.', 'card', state.cards.length > 0),
+    done('cartoes-3', 'Carteira recheada', 'Tem 3 cartões cadastrados.', 'wallet', state.cards.length >= 3),
+    done('parcelado', 'Em suaves parcelas', 'Lançou uma compra parcelada.', 'shopping', state.purchases.some((p) => p.installments > 1)),
+    done('recorrente', 'Piloto automático', 'Lançou uma assinatura no cartão.', 'tv', state.purchases.some((p) => p.recurring)),
+    done('fatura-paga', 'Fatura quitada', 'Marcou uma fatura como paga.', 'lock', state.invoices.some((i) => !!i.paid_at)),
+    done('contas-10', 'Mestre das contas', 'Cadastrou 10 contas.', 'calendar', state.entries.filter((e) => e.kind === 'expense').length >= 10),
+    done('rendas-2', 'Renda extra', 'Tem duas fontes de renda no mesmo mês.', 'briefcase', incomesNow >= 2),
+    done('dia-a-dia', 'Pé no chão', 'Definiu quanto gasta no dia a dia.', 'cart', state.user.daily_budget_cents > 0),
+    done('adiantado', 'Adiantado', 'Pagou uma conta antes do vencimento.', 'bulb', early),
+    done('metas-3', 'Sonhador', 'Criou 3 metas.', 'sparkles', state.goals.length >= 3),
+    done('meta-prazo', 'Com data marcada', 'Criou uma meta com prazo.', 'calendar-spiral', state.goals.some((g) => !!g.deadline)),
+    done('viajante', 'Pé na estrada', 'Tem uma meta de viagem.', 'plane', state.goals.some((g) => g.icon === 'plane' || g.icon === 'beach')),
+    done('guardou-1k', 'Primeiro milhar', 'Juntou R$ 1.000 nas metas.', 'money-bag', saved >= 100_000),
+    done('guardou-10k', 'Cinco dígitos', 'Juntou R$ 10.000 nas metas.', 'gem', saved >= 1_000_000),
+    done('guardou-100k', 'Seis dígitos', 'Juntou R$ 100.000 nas metas.', 'bank', saved >= 10_000_000),
+    done('metas-batidas-3', 'Colecionador', 'Bateu 3 metas.', 'chart-bar', goalsHit >= 3),
+    done('retirada', 'Pra isso que serve', 'Usou o dinheiro de uma meta quando precisou.', 'umbrella', state.goalMoves.some((m) => m.amount_cents < 0)),
+    done('formiguinha', 'Formiguinha', 'Fechou um mês com 30% da renda sobrando.', 'seedling', thrifty),
+    done('meses-zerados-3', 'Trinca perfeita', 'Pagou todas as contas em 3 meses.', 'key', monthsAllPaid >= 3),
+    done('azul-12', 'Um ano no azul', '12 meses seguidos fechando no azul.', 'money-wings', run >= 12),
+    done('desafio', 'Do meu jeito', 'Criou uma conquista própria.', 'gift', state.challenges.length > 0),
+    done('desafio-ok', 'Promessa cumprida', 'Concluiu uma conquista própria.', 'party', state.challenges.some((c) => !!c.done_at)),
   ]
 }
 
 /** Conquistas que acabaram de ser desbloqueadas desde a última vez neste aparelho (por conta). */
 export const newlyUnlocked = (userId: string, list: Achievement[]): Achievement[] => {
-  const key = `gf-conquistas:${userId}`
+  // v2: entraram as secretas; quem já cumpria alguma não ganha uma enxurrada de festas
+  const key = `gf-conquistas-v2:${userId}`
   const done = list.filter((a) => a.done)
   try {
     const raw = localStorage.getItem(key)

@@ -54,6 +54,18 @@ export const GOAL_ICON_LABELS: Record<string, string> = {
   party: 'Festa',
 }
 
+/** Ícones para conquistas criadas pela pessoa. */
+export const CHALLENGE_ICONS = [
+  'target', 'rocket', 'gem', 'seedling', 'party', 'gift', 'education', 'plane',
+  'beach', 'house-garden', 'car', 'pet', 'bulb', 'sparkles', 'key', 'money-bag',
+]
+export const CHALLENGE_ICON_LABELS: Record<string, string> = {
+  ...GOAL_ICON_LABELS,
+  bulb: 'Lâmpada',
+  sparkles: 'Brilho',
+  key: 'Chave',
+}
+
 export const CARD_COLORS: Record<string, { label: string; bg: string }> = {
   graphite: { label: 'Grafite', bg: 'linear-gradient(135deg, #3a3d45 0%, #17181c 55%, #2a2c33 100%)' },
   blue: { label: 'Azul', bg: 'linear-gradient(135deg, #2f6bf0 0%, #1740b8 100%)' },

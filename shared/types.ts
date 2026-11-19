@@ -76,6 +76,18 @@ export type GoalMove = {
   month: string | null
 }
 
+/** Conquista criada pela própria pessoa. */
+export type Challenge = {
+  id: string
+  title: string
+  text: string
+  icon: string
+  /** Ano a que se refere (ex.: 2027), ou null. */
+  year: number | null
+  /** Quando foi concluída, ou null. */
+  done_at: string | null
+}
+
 export type Billing = {
   /** Situação do plano. */
   /** 'active' = cartão com renovação automática; 'prepaid' = pago mês a mês. */
@@ -110,4 +122,5 @@ export type AppState = {
   invoices: Invoice[]
   goals: Goal[]
   goalMoves: GoalMove[]
+  challenges: Challenge[]
 }

@@ -38,6 +38,9 @@ type Body = Record<string, unknown>
 /** Nome de cada campo como a pessoa o vê na tela, para as mensagens de erro. */
 const FIELD: Record<string, string> = {
   name: 'nome',
+  title: 'nome',
+  text: 'descrição',
+  year: 'ano',
   email: 'e-mail',
   category: 'categoria',
   amount_cents: 'valor',
@@ -515,6 +518,7 @@ app.post('/account/delete', async (c) => {
     db.prepare('DELETE FROM entry_months WHERE entry_id IN (SELECT id FROM entries WHERE user_id = ?)').bind(uid),
     db.prepare('DELETE FROM entries WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM goals WHERE user_id = ?').bind(uid),
+    db.prepare('DELETE FROM challenges WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM invoices WHERE card_id IN (SELECT id FROM cards WHERE user_id = ?)').bind(uid),
     db.prepare('DELETE FROM purchases WHERE user_id = ?').bind(uid),
     db.prepare('DELETE FROM cards WHERE user_id = ?').bind(uid),
@@ -557,7 +561,7 @@ app.post('/auth/password', async (c) => {
 
 const loadState = async (env: Env, uid: string): Promise<AppState> => {
   const db = env.DB
-  const [user, entries, entryMonths, cards, purchases, invoices, goals, goalMoves] = await db.batch([
+  const [user, entries, entryMonths, cards, purchases, invoices, goals, goalMoves, challenges] = await db.batch([
     db.prepare('SELECT id, email, name, daily_budget_cents, plan, trial_ends_at, paid_until FROM users WHERE id = ?').bind(uid),
     db
       .prepare(
@@ -592,6 +596,7 @@ const loadState = async (env: Env, uid: string): Promise<AppState> => {
         'SELECT id, goal_id, amount_cents, date, note, entry_id, month FROM goal_moves WHERE user_id = ? ORDER BY date DESC, rowid DESC',
       )
       .bind(uid),
+    db.prepare('SELECT id, title, text, icon, year, done_at FROM challenges WHERE user_id = ? ORDER BY created_at').bind(uid),
   ])
   type Row = Record<string, unknown>
   const flag = (rows: Row[], ...keys: string[]) =>
@@ -606,6 +611,7 @@ const loadState = async (env: Env, uid: string): Promise<AppState> => {
     invoices: invoices.results,
     goals: goals.results,
     goalMoves: goalMoves.results,
+    challenges: challenges.results,
   } as unknown as AppState
 }
 
@@ -626,7 +632,7 @@ app.put('/me', async (c) => {
 })
 
 /** Garante que o registro existe e é do usuário logado. */
-const owned = async (c: Ctx, table: 'entries' | 'cards' | 'purchases' | 'goals' | 'goal_moves', id: string) => {
+const owned = async (c: Ctx, table: 'entries' | 'cards' | 'purchases' | 'goals' | 'goal_moves' | 'challenges', id: string) => {
   const row = await c.env.DB.prepare(`SELECT id FROM ${table} WHERE id = ? AND user_id = ?`)
     .bind(id, c.get('userId'))
     .first()
@@ -634,7 +640,7 @@ const owned = async (c: Ctx, table: 'entries' | 'cards' | 'purchases' | 'goals' 
 }
 
 /** Teto de registros por conta: uso normal não chega nem perto; serve para barrar abuso. */
-const LIMITS = { entries: 2000, cards: 50, purchases: 5000, goals: 100, goal_moves: 5000 } as const
+const LIMITS = { entries: 2000, cards: 50, purchases: 5000, goals: 100, goal_moves: 5000, challenges: 200 } as const
 const underLimit = async (c: Ctx, table: keyof typeof LIMITS) => {
   const row = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`)
     .bind(c.get('userId'))
@@ -916,6 +922,51 @@ app.delete('/goals/:id', async (c) => {
     db.prepare('DELETE FROM goal_moves WHERE goal_id = ?').bind(id),
     db.prepare('DELETE FROM goals WHERE id = ?').bind(id),
   ])
+  return c.json({ ok: true })
+})
+
+// ---------- conquistas próprias ----------
+
+const challengeFields = (b: Body) => {
+  const year = b.year == null ? null : int(b, 'year', 2000, 2100)
+  return [text(b, 'title', { max: 60 }), optText(b, 'text', 140), slug(b, 'icon', 30), year] as const
+}
+
+app.post('/challenges', async (c) => {
+  await underLimit(c, 'challenges')
+  const f = challengeFields(await readBody(c))
+  const id = crypto.randomUUID()
+  await c.env.DB.prepare('INSERT INTO challenges (title, text, icon, year, id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(...f, id, c.get('userId'), now())
+    .run()
+  return c.json({ id })
+})
+
+app.put('/challenges/:id', async (c) => {
+  const id = c.req.param('id')
+  await owned(c, 'challenges', id)
+  const f = challengeFields(await readBody(c))
+  await c.env.DB.prepare('UPDATE challenges SET title = ?, text = ?, icon = ?, year = ? WHERE id = ?')
+    .bind(...f, id)
+    .run()
+  return c.json({ ok: true })
+})
+
+// marcar ou desmarcar como concluída
+app.post('/challenges/:id/done', async (c) => {
+  const id = c.req.param('id')
+  await owned(c, 'challenges', id)
+  const done = bool(await readBody(c), 'done')
+  await c.env.DB.prepare('UPDATE challenges SET done_at = ? WHERE id = ?')
+    .bind(done ? now() : null, id)
+    .run()
+  return c.json({ ok: true })
+})
+
+app.delete('/challenges/:id', async (c) => {
+  const id = c.req.param('id')
+  await owned(c, 'challenges', id)
+  await c.env.DB.prepare('DELETE FROM challenges WHERE id = ?').bind(id).run()
   return c.json({ ok: true })
 })
 
