@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError, api } from '../lib/api.ts'
 import { Link, navigate } from '../router.tsx'
-import { PublicShell } from './Public.tsx'
-import { Emoji, Field, PasswordInput, TextInput } from '../ui.tsx'
+import { PublicShell, linkButton } from './Public.tsx'
+import { Button, Emoji, Field, PasswordInput, TextInput, cx } from '../ui.tsx'
 
 export type AuthMode = 'login' | 'signup' | 'forgot' | 'reset'
 
@@ -91,19 +91,19 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
           <Link href="/" aria-label="Poupin: página inicial">
             <Emoji name="mascote" size={96} className="mascot drop-shadow-[0_12px_14px_rgb(0_0_0/0.16)]" />
           </Link>
-          <h1 className="mt-4 text-4xl font-extrabold tracking-[-0.04em]">{copy.title}</h1>
+          <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{copy.title}</h1>
           <p className="mt-1 text-muted">
             {mode === 'signup' ? `${trialDays} dias grátis, sem cartão. Leva menos de um minuto.` : copy.lead}
           </p>
         </div>
 
         {missingToken ? (
-          <div role="alert" className="box mt-6 space-y-3 p-5 text-center shadow-[6px_6px_0_var(--ink)] sm:p-6">
+          <div role="alert" className="mt-6 space-y-3 rounded-panel border border-line bg-surface p-5 text-center shadow-card sm:p-6">
             <p className="font-semibold">Este link não está completo</p>
             <p className="text-muted">
               Abra o link direto do e-mail, sem cortar nenhum pedaço. Se não funcionar, peça um link novo.
             </p>
-            <Link href="/recuperar-senha" className="btn-ink h-12 w-full text-base">
+            <Link href="/recuperar-senha" className={cx(linkButton('primary', 'lg'), 'w-full')}>
               Pedir um link novo
             </Link>
           </div>
@@ -116,7 +116,7 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
           </div>
         ) : (
           <form
-            className="box mt-6 space-y-4 p-5 shadow-[6px_6px_0_var(--ink)] sm:p-6"
+            className="mt-6 space-y-4 rounded-panel border border-line bg-surface p-5 shadow-card sm:p-6"
             onSubmit={(e) => {
               e.preventDefault()
               submit()
@@ -211,9 +211,9 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
                 )}
               </p>
             )}
-            <button type="submit" className="btn-ink h-13 w-full text-base disabled:opacity-60" disabled={busy}>
+            <Button type="submit" variant="primary" size="lg" className="w-full" disabled={busy}>
               {busy ? copy.busy : copy.action}
-            </button>
+            </Button>
           </form>
         )}
         <p className="mt-5 text-center text-muted">{footer}</p>
