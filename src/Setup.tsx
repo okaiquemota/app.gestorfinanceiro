@@ -9,19 +9,20 @@ import { brl } from './lib/format.ts'
 import { useStore } from './store.tsx'
 import { Amount, Button, DaySelect, Emoji, Field, IconButton, Modal, MoneyInput, TextInput, cx } from './ui.tsx'
 
-const DONE_KEY = 'gf-setup-done'
+// Por conta: num aparelho usado por duas pessoas, cada uma vê a sua configuração inicial.
+const doneKey = (userId: string) => `gf-setup-done:${userId}`
 
-/** Já passou (ou pulou) a configuração inicial neste aparelho? */
-export const setupSeen = (): boolean => {
+/** Esta conta já passou (ou pulou) a configuração inicial neste aparelho? */
+export const setupSeen = (userId: string): boolean => {
   try {
-    return localStorage.getItem(DONE_KEY) === '1'
+    return localStorage.getItem(doneKey(userId)) === '1'
   } catch {
     return false
   }
 }
-export const markSetupSeen = () => {
+export const markSetupSeen = (userId: string) => {
   try {
-    localStorage.setItem(DONE_KEY, '1')
+    localStorage.setItem(doneKey(userId), '1')
   } catch {
     // sem localStorage: a configuração pode reaparecer num próximo acesso sem dados
   }
@@ -61,7 +62,7 @@ export function SetupWizard() {
 
   const firstName = state.user.name.split(' ')[0]
   const finish = () => {
-    markSetupSeen()
+    markSetupSeen(state.user.id)
     closeSetup()
   }
 
@@ -101,7 +102,10 @@ export function SetupWizard() {
               estimated: b.estimated,
               goal_id: null,
               notes: '',
-            })
+            }).then(() =>
+              // salva uma a uma e já tira do rascunho: se uma falhar, tentar de novo não duplica as outras
+              setBills((list) => list.filter((x) => x.key !== b.key)),
+            )
         }
     } else if (step === 3) {
       const filled = cards.filter((c) => c.name.trim())
@@ -115,7 +119,7 @@ export function SetupWizard() {
               limit_cents: 0,
               closing_day: c.closing,
               due_day: c.due,
-            })
+            }).then(() => setCards((list) => list.filter((x) => x.key !== c.key)))
         }
     } else if (step === 4 && daily !== state.user.daily_budget_cents) {
       work = () => api('PUT', '/me', { name: state.user.name, daily_budget_cents: daily })

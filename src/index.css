@@ -128,44 +128,52 @@
   --shadow-pop: var(--shadow-pop);
 }
 
-html {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-feature-settings: 'cv11', 'ss01';
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-}
+/*
+ * Regras de elemento ficam na camada "base": assim qualquer classe utilitária
+ * (transition-colors, outline-none…) passa por cima delas, como esperado.
+ */
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-body {
-  min-height: var(--app-vh, 100dvh);
-  font-size: 14px;
-  line-height: 1.45;
-}
+  body {
+    min-height: var(--app-vh, 100dvh);
+    font-size: 14px;
+    line-height: 1.45;
+  }
 
-/* resposta ao toque: um leve afundar, sem depender de hover */
-button:not(:disabled):active,
-a[class*='rounded']:active {
-  transform: translateY(0.5px) scale(0.985);
-}
-button,
-a {
-  transition: transform 0.08s ease-out;
-}
+  /* resposta ao toque: um leve afundar, sem depender de hover */
+  button:not(:disabled):active,
+  a[class*='rounded']:active {
+    transform: translateY(0.5px) scale(0.985);
+  }
+  button,
+  a {
+    transition-property: transform, color, background-color, border-color, opacity, box-shadow;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+  }
 
-button,
-[role='button'],
-select,
-summary {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: default;
-}
+  button,
+  [role='button'],
+  select,
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 .tnum {
@@ -492,6 +500,10 @@ main:focus {
   .reveal {
     opacity: 1;
     transform: none;
+  }
+  /* sem animação o confete ficaria parado no topo da tela: some de vez */
+  .confetti {
+    display: none;
   }
 }
 

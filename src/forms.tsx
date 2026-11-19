@@ -218,7 +218,14 @@ function EntryForm({ kind, entry, preset }: { kind: EntryKind; entry?: Entry; pr
       onClose={closeForm}
       onSubmit={() =>
         submit(() => (entry ? api('PUT', `/entries/${entry.id}`, payload) : api('POST', '/entries', payload)), {
-          problem: amount <= 0 ? 'Informe o valor.' : !name.trim() ? `Dê um nome pra ${noun}.` : null,
+          problem:
+            amount <= 0
+              ? 'Informe o valor.'
+              : !name.trim()
+                ? `Dê um nome pra ${noun}.`
+                : repeat === 'installments' && (!Number.isInteger(count) || count < 2 || count > 480)
+                  ? `${income ? 'O número de meses' : 'O número de parcelas'} precisa ficar entre 2 e 480.`
+                  : null,
           success: entry ? 'Alterações salvas.' : income ? 'Renda adicionada.' : 'Conta adicionada.',
         })
       }
@@ -295,7 +302,7 @@ function EntryForm({ kind, entry, preset }: { kind: EntryKind; entry?: Entry; pr
         label={repeat === 'once' ? 'Mês' : repeat === 'installments' ? 'Primeira em' : 'A partir de'}
         hint={
           repeat === 'installments' && end
-            ? `${Math.max(1, count)}× de ${brl(amount)} — última em ${monthLong(end)}.`
+            ? `${Math.max(1, count)}× de ${brl(amount)}, a última em ${monthLong(end)}.`
             : undefined
         }
       >
@@ -541,7 +548,20 @@ function PurchaseForm({ purchase, cardId }: { purchase?: Purchase; cardId?: stri
         submit(() =>
           purchase ? api('PUT', `/purchases/${purchase.id}`, payload) : api('POST', '/purchases', payload),
           {
-            problem: amount <= 0 ? 'Informe o valor.' : !desc.trim() ? 'Diga o que foi a compra.' : !card ? 'Escolha um cartão.' : null,
+            problem:
+              amount <= 0
+                ? 'Informe o valor.'
+                : !desc.trim()
+                  ? 'Diga o que foi a compra.'
+                  : !card
+                    ? 'Escolha um cartão.'
+                    : !first
+                      ? 'Informe a data da compra.'
+                      : mode === 'installments' && (!Number.isInteger(count) || count < 2 || count > 120)
+                        ? 'O número de parcelas precisa ficar entre 2 e 120.'
+                        : mode === 'installments' && amount < n
+                          ? 'O valor total é menor que o número de parcelas.'
+                          : null,
             success: purchase ? 'Alterações salvas.' : 'Compra adicionada.',
           },
         )

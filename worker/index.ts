@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Context } from 'hono'
+import { bodyLimit } from 'hono/body-limit'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import type { AppState, User } from '../shared/types.ts'
 import { billingFor, cancelAtPeriodEnd, cancelNow, createCheckout, handleWebhook, syncSession, syncSubscription, trialEnd, validWebhook } from './billing.ts'
@@ -20,7 +21,7 @@ type HonoEnv = { Bindings: Env; Variables: { userId: string } }
 type Ctx = Context<HonoEnv>
 
 class HttpError extends Error {
-  status: 400 | 401 | 402 | 403 | 404 | 409 | 429 | 503
+  status: 400 | 401 | 402 | 403 | 404 | 409 | 413 | 429 | 503
   /** Código estável para o front reagir (ex.: abrir a tela de assinatura). */
   code?: string
   constructor(status: HttpError['status'], message: string, code?: string) {
@@ -34,20 +35,58 @@ class HttpError extends Error {
 
 type Body = Record<string, unknown>
 
+/** Nome de cada campo como a pessoa o vê na tela, para as mensagens de erro. */
+const FIELD: Record<string, string> = {
+  name: 'nome',
+  email: 'e-mail',
+  category: 'categoria',
+  amount_cents: 'valor',
+  target_cents: 'valor da meta',
+  limit_cents: 'limite',
+  daily_budget_cents: 'gasto do dia a dia',
+  due_day: 'dia de vencimento',
+  closing_day: 'dia de fechamento',
+  start_month: 'mês de início',
+  end_month: 'mês final',
+  first_month: 'primeira fatura',
+  installments: 'número de parcelas',
+  description: 'descrição',
+  notes: 'observação',
+  note: 'observação',
+  icon: 'ícone',
+  card_id: 'cartão',
+  last4: 'final do cartão',
+  deadline: 'prazo',
+  purchased_at: 'data da compra',
+  date: 'data',
+}
+const label = (k: string) => FIELD[k] ?? k
+
+// Caracteres de controle (quebra de linha, tab, NUL…) não têm lugar em nomes curtos.
+const CONTROL = /[\u0000-\u001f\u007f\u2028\u2029]/g
+
 const text = (b: Body, k: string, { max = 120, min = 1 } = {}): string => {
   const v = b[k]
-  if (typeof v !== 'string') throw new HttpError(400, `Campo "${k}" é obrigatório.`)
-  const t = v.trim()
-  if (t.length < min || t.length > max) throw new HttpError(400, `Campo "${k}" inválido.`)
+  if (typeof v !== 'string') throw new HttpError(400, `Preencha o campo ${label(k)}.`)
+  const t = v.replace(CONTROL, ' ').trim()
+  if (t.length < min) throw new HttpError(400, `Preencha o campo ${label(k)}.`)
+  if (t.length > max) throw new HttpError(400, `O campo ${label(k)} aceita no máximo ${max} caracteres.`)
   return t
 }
 const optText = (b: Body, k: string, max = 500): string =>
   b[k] == null ? '' : text(b, k, { max, min: 0 })
 
+/** Identificador curto (categoria, ícone): só letras minúsculas, números e hífen. */
+const slug = (b: Body, k: string, max: number): string => {
+  const v = text(b, k, { max })
+  if (!/^[a-z0-9-]+$/.test(v)) throw new HttpError(400, `O campo ${label(k)} é inválido.`)
+  return v
+}
+
 const int = (b: Body, k: string, min: number, max: number): number => {
   const v = b[k]
   if (typeof v !== 'number' || !Number.isInteger(v) || v < min || v > max)
-    throw new HttpError(400, `Campo "${k}" inválido.`)
+    throw new HttpError(400, `O campo ${label(k)} é inválido.`)
   return v
 }
 const MAX_CENTS = 100_000_000_000 // R$ 1 bilhão
@@ -57,14 +96,16 @@ const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 const DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 const isMonth = (v: unknown): v is string => typeof v === 'string' && MONTH.test(v)
 const month = (b: Body, k: string): string => {
-  if (!isMonth(b[k])) throw new HttpError(400, `Campo "${k}" deve ser um mês (AAAA-MM).`)
+  if (!isMonth(b[k])) throw new HttpError(400, `Escolha um mês válido para o campo ${label(k)}.`)
   return b[k]
 }
 const optMonth = (b: Body, k: string): string | null => (b[k] == null ? null : month(b, k))
 const optDate = (b: Body, k: string): string | null => {
   const v = b[k]
   if (v == null || v === '') return null
-  if (typeof v !== 'string' || !DATE.test(v)) throw new HttpError(400, `Campo "${k}" deve ser uma data.`)
+  // a regex aceita 31/02; a conversão de volta confere se o dia existe
+  if (typeof v !== 'string' || !DATE.test(v) || new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) !== v)
+    throw new HttpError(400, `A ${label(k)} informada não existe.`)
   return v
 }
 const bool = (b: Body, k: string): boolean => b[k] === true
@@ -89,17 +130,44 @@ app.onError((err, c) => {
   return c.json({ error: 'Erro inesperado. Tente de novo.' }, 500)
 })
 
+const WEBHOOK_PATH = '/api/billing/webhook'
+
+/** A requisição veio de uma página do próprio Poupin? ("null", ausente ou malformado = não) */
+const sameOrigin = (c: Ctx): boolean => {
+  const origin = c.req.header('Origin')
+  if (!origin) return false
+  try {
+    return new URL(origin).origin === new URL(c.req.url).origin
+  } catch {
+    return false
+  }
+}
+
 app.use('*', async (c, next) => {
+  // cabeçalhos de defesa também nas respostas da API (o _headers só vale para os arquivos estáticos)
   c.header('Cache-Control', 'no-store')
+  c.header('X-Content-Type-Options', 'nosniff')
+  c.header('X-Frame-Options', 'DENY')
+  c.header('Referrer-Policy', 'same-origin')
+  c.header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'")
+  if (new URL(c.req.url).protocol === 'https:') c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
   // CSRF: além do cookie SameSite=Strict, toda escrita precisa vir da própria origem.
   // (o webhook da Stripe vem de fora e é conferido pela assinatura dele)
-  if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && !c.req.path.endsWith('/billing/webhook')) {
-    const origin = c.req.header('Origin')
-    if (!origin || new URL(origin).host !== new URL(c.req.url).host)
-      throw new HttpError(403, 'Origem não permitida.')
-  }
+  if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && c.req.path !== WEBHOOK_PATH && !sameOrigin(c))
+    throw new HttpError(403, 'Origem não permitida.')
   await next()
 })
+
+// Nenhuma tela manda mais que alguns KB; corpos enormes só servem para gastar CPU.
+app.use(
+  '*',
+  bodyLimit({
+    maxSize: 64 * 1024,
+    onError: () => {
+      throw new HttpError(413, 'Requisição grande demais.')
+    },
+  }),
+)
 
 // ---------- autenticação ----------
 
@@ -125,9 +193,10 @@ const startSession = async (c: Ctx, userId: string) => {
 
 const sessionUser = async (c: Ctx): Promise<string | null> => {
   const token = getCookie(c, SESSION_COOKIE)
-  if (!token) return null
+  if (!token || !/^[0-9a-f]{64}$/.test(token)) return null
+  // o JOIN garante que a conta ainda existe (sessão órfã = sem login)
   const row = await c.env.DB.prepare(
-    'SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?',
+    'SELECT s.user_id FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?',
   )
     .bind(await sha256(token), Date.now())
     .first<{ user_id: string }>()
@@ -135,33 +204,51 @@ const sessionUser = async (c: Ctx): Promise<string | null> => {
 }
 
 const WINDOW_MS = 15 * 60_000
-const MAX_ATTEMPTS = 8
+const TOO_MANY = 'Muitas tentativas seguidas. Por segurança, bloqueamos por 15 minutos. Tente de novo depois.'
 
-/** Freia tentativas repetidas de login/cadastro vindas do mesmo IP. */
-const throttle = async (c: Ctx): Promise<{ fail: () => Promise<void> }> => {
-  const key = c.req.header('CF-Connecting-IP') ?? 'local'
+/**
+ * Freia tentativas repetidas. Cada chave tem seu teto na janela de 15 minutos:
+ * o IP (robô testando muitas contas) e, quando faz sentido, a própria conta
+ * (muitos IPs testando senhas de uma conta só).
+ */
+const throttle = async (c: Ctx, keys: [key: string, max: number][]): Promise<{ fail: () => Promise<void> }> => {
+  const db = c.env.DB
   const since = Date.now() - WINDOW_MS
-  const row = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM auth_attempts WHERE key = ? AND at > ?')
-    .bind(key, since)
-    .first<{ n: number }>()
-  if ((row?.n ?? 0) >= MAX_ATTEMPTS)
-    throw new HttpError(429, 'Muitas tentativas. Espere alguns minutos e tente de novo.')
+  const counts = await db.batch(
+    keys.map(([key]) => db.prepare('SELECT COUNT(*) AS n FROM auth_attempts WHERE key = ? AND at > ?').bind(key, since)),
+  )
+  keys.forEach(([, max], i) => {
+    if (((counts[i].results[0] as { n: number } | undefined)?.n ?? 0) >= max) throw new HttpError(429, TOO_MANY)
+  })
   return {
     fail: async () => {
-      await c.env.DB.batch([
-        c.env.DB.prepare('DELETE FROM auth_attempts WHERE at <= ?').bind(since),
-        c.env.DB.prepare('INSERT INTO auth_attempts (key, at) VALUES (?, ?)').bind(key, Date.now()),
+      await db.batch([
+        db.prepare('DELETE FROM auth_attempts WHERE at <= ?').bind(since),
+        ...keys.map(([key]) => db.prepare('INSERT INTO auth_attempts (key, at) VALUES (?, ?)').bind(key, Date.now())),
       ])
     },
   }
 }
 
+const ipKey = (c: Ctx) => `ip:${c.req.header('CF-Connecting-IP') ?? 'local'}`
+
 const password = (b: Body, k: string): string => {
   const v = b[k]
-  if (typeof v !== 'string' || v.length < 8 || v.length > 200)
-    throw new HttpError(400, 'A senha precisa ter pelo menos 8 caracteres.')
+  if (typeof v !== 'string' || v.length < 8) throw new HttpError(400, 'A senha precisa ter pelo menos 8 caracteres.')
+  if (v.length > 200) throw new HttpError(400, 'A senha pode ter no máximo 200 caracteres.')
   return v
 }
+
+/** Senha digitada pra conferir (login, confirmação): só limita o tamanho. */
+const typedPassword = (b: Body, k: string): string => {
+  const v = b[k]
+  return typeof v === 'string' && v.length <= 200 ? v : ''
+}
+
+const checkPassword = async (pass: string, user: { password_hash: string; password_salt: string }) =>
+  safeEqual(await hashPassword(pass, user.password_salt), user.password_hash)
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 app.get('/auth/status', async (c) => c.json({ authenticated: !!(await sessionUser(c)) }))
 
@@ -173,23 +260,29 @@ app.get('/public/plan', (c) => {
 
 app.post('/auth/signup', async (c) => {
   const b = await readBody(c)
-  const guard = await throttle(c)
+  const guard = await throttle(c, [[`signup:${ipKey(c)}`, 8]])
   if (b.accept_terms !== true) throw new HttpError(400, 'Para criar a conta é preciso aceitar os termos de uso e a política de privacidade.')
   const email = text(b, 'email', { max: 200, min: 3 }).toLowerCase()
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'E-mail inválido.')
+  if (!EMAIL.test(email)) throw new HttpError(400, 'E-mail inválido.')
   const name = text(b, 'name', { max: 60 })
   const pass = password(b, 'password')
   // toda tentativa de cadastro conta no freio por IP: evita criação de contas em massa
   await guard.fail()
-  if (await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first())
-    throw new HttpError(409, 'Já existe uma conta com este e-mail. Entre ou recupere a senha.')
+  const taken = () => new HttpError(409, 'Já existe uma conta com este e-mail. Entre ou recupere a senha.')
+  if (await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()) throw taken()
   const salt = randomHex(16)
   const id = crypto.randomUUID()
-  await c.env.DB.prepare(
-    "INSERT INTO users (id, email, name, password_hash, password_salt, created_at, plan, trial_ends_at, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 'trial', ?, ?)",
-  )
-    .bind(id, email, name, await hashPassword(pass, salt), salt, now(), trialEnd(c.env), now())
-    .run()
+  try {
+    await c.env.DB.prepare(
+      "INSERT INTO users (id, email, name, password_hash, password_salt, created_at, plan, trial_ends_at, terms_accepted_at) VALUES (?, ?, ?, ?, ?, ?, 'trial', ?, ?)",
+    )
+      .bind(id, email, name, await hashPassword(pass, salt), salt, now(), trialEnd(c.env), now())
+      .run()
+  } catch (e) {
+    // dois cadastros com o mesmo e-mail ao mesmo tempo: o índice único segura o segundo
+    if (e instanceof Error && /UNIQUE/i.test(e.message)) throw taken()
+    throw e
+  }
   await startSession(c, id)
   return c.json({ ok: true })
 })
@@ -198,11 +291,16 @@ app.post('/auth/signup', async (c) => {
 
 app.post('/auth/forgot', async (c) => {
   const b = await readBody(c)
-  const guard = await throttle(c)
-  await guard.fail()
   if (!emailEnabled(c.env))
     throw new HttpError(503, 'A recuperação de senha por e-mail ainda não está disponível. Fale com o suporte.')
-  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
+  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase().slice(0, 200) : ''
+  if (!EMAIL.test(email)) throw new HttpError(400, 'E-mail inválido.')
+  // por IP e por destinatário: ninguém consegue encher a caixa de entrada de outra pessoa
+  const guard = await throttle(c, [
+    [`forgot:${ipKey(c)}`, 8],
+    [`forgot:${email}`, 3],
+  ])
+  await guard.fail()
   const user = await c.env.DB.prepare('SELECT id, name FROM users WHERE email = ?').bind(email).first<{ id: string; name: string }>()
   if (user) {
     const token = randomHex(32)
@@ -215,12 +313,16 @@ app.post('/auth/forgot', async (c) => {
       ),
     ])
     const link = `${new URL(c.req.url).origin}/nova-senha?token=${token}`
-    const first = user.name.split(' ')[0].replace(/[<>&"]/g, '')
-    await sendEmail(
-      c.env,
-      email,
-      'Poupin: criar uma nova senha',
-      `<p>Oi, ${first}.</p><p>Recebemos um pedido para criar uma nova senha no Poupin. O link vale por 1 hora:</p><p><a href="${link}">${link}</a></p><p>Se não foi você, é só ignorar este e-mail: sua senha continua a mesma.</p>`,
+    const first = user.name.split(' ')[0].replace(/[<>&"']/g, '')
+    // o envio corre depois da resposta: o tempo de resposta (e uma falha no envio)
+    // não denuncia se o e-mail tem conta
+    c.executionCtx.waitUntil(
+      sendEmail(
+        c.env,
+        email,
+        'Poupin: criar uma nova senha',
+        `<p>Oi, ${first}.</p><p>Recebemos um pedido para criar uma nova senha no Poupin. O link vale por 1 hora:</p><p><a href="${link}">${link}</a></p><p>Se não foi você, é só ignorar este e-mail: sua senha continua a mesma.</p>`,
+      ).catch((e) => console.error('forgot', e instanceof Error ? e.message : e)),
     )
   }
   // mesma resposta existindo ou não a conta: não revela quem tem cadastro
@@ -229,11 +331,14 @@ app.post('/auth/forgot', async (c) => {
 
 app.post('/auth/reset', async (c) => {
   const b = await readBody(c)
-  const guard = await throttle(c)
+  const guard = await throttle(c, [[`reset:${ipKey(c)}`, 8]])
   const token = typeof b.token === 'string' ? b.token : ''
-  const row = await c.env.DB.prepare('SELECT user_id FROM password_resets WHERE token_hash = ? AND expires_at > ?')
-    .bind(await sha256(token), Date.now())
-    .first<{ user_id: string }>()
+  const pass = password(b, 'password')
+  const row = /^[0-9a-f]{64}$/.test(token)
+    ? await c.env.DB.prepare('SELECT user_id FROM password_resets WHERE token_hash = ? AND expires_at > ?')
+        .bind(await sha256(token), Date.now())
+        .first<{ user_id: string }>()
+    : null
   if (!row) {
     await guard.fail()
     throw new HttpError(400, 'Este link expirou ou já foi usado. Peça um novo.')
@@ -241,7 +346,7 @@ app.post('/auth/reset', async (c) => {
   const salt = randomHex(16)
   await c.env.DB.batch([
     c.env.DB.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').bind(
-      await hashPassword(password(b, 'password'), salt),
+      await hashPassword(pass, salt),
       salt,
       row.user_id,
     ),
@@ -272,15 +377,19 @@ app.post('/billing/webhook', async (c) => {
 
 app.post('/auth/login', async (c) => {
   const b = await readBody(c)
-  const guard = await throttle(c)
-  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
-  const pass = typeof b.password === 'string' ? b.password : ''
+  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase().slice(0, 200) : ''
+  const pass = typedPassword(b, 'password')
+  // 8 erros por IP; 15 por conta, vindos de qualquer lugar (senha sendo testada aos poucos)
+  const guard = await throttle(c, [
+    [`login:${ipKey(c)}`, 8],
+    [`login:${email}`, 15],
+  ])
   const user = await c.env.DB.prepare('SELECT id, password_hash, password_salt FROM users WHERE email = ?')
     .bind(email)
     .first<{ id: string; password_hash: string; password_salt: string }>()
   // calcula o hash mesmo sem usuário, pra resposta levar o mesmo tempo
   const hash = await hashPassword(pass, user?.password_salt ?? '00000000000000000000000000000000')
-  if (!user || !safeEqual(hash, user.password_hash)) {
+  if (!user || !pass || !safeEqual(hash, user.password_hash)) {
     await guard.fail()
     throw new HttpError(401, 'E-mail ou senha incorretos.')
   }
@@ -290,7 +399,7 @@ app.post('/auth/login', async (c) => {
 
 app.post('/auth/logout', async (c) => {
   const token = getCookie(c, SESSION_COOKIE)
-  if (token)
+  if (token && /^[0-9a-f]{64}$/.test(token))
     await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run()
   deleteCookie(c, SESSION_COOKIE, { path: '/' })
   return c.json({ ok: true })
@@ -303,7 +412,7 @@ app.use('*', async (c, next) => {
   c.set('userId', userId)
   // Teste encerrado e sem assinatura: dá pra ver e exportar, não pra alterar.
   // Assinar, sair, trocar senha e excluir a conta continuam liberados.
-  const free = /\/(auth|billing|account)\//.test(c.req.path)
+  const free = /^\/api\/(auth|billing|account)\//.test(c.req.path)
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD' && !free) {
     const u = await planRow(c.env.DB, userId)
     if (u && billingFor(u, c.env).access === 'readonly')
@@ -331,6 +440,8 @@ const requireBilling = (c: Ctx) => {
 // Abre a página de pagamento da Stripe para o plano e a forma escolhidos.
 app.post('/billing/checkout', async (c) => {
   requireBilling(c)
+  const guard = await throttle(c, [[`checkout:${c.get('userId')}`, 20]])
+  await guard.fail()
   const b = (await c.req.json().catch(() => ({}))) as Body
   const user = await billingUser(c)
   if (!user) throw new HttpError(404, 'Conta não encontrada.')
@@ -347,6 +458,9 @@ app.post('/billing/checkout', async (c) => {
 // Ao voltar da Stripe: confere o pagamento sem esperar o aviso automático.
 app.post('/billing/sync', async (c) => {
   if (!c.env.STRIPE_SECRET_KEY) return c.json({ ok: true })
+  // cada chamada consulta a Stripe: um teto evita gastar a cota da API à toa
+  const guard = await throttle(c, [[`sync:${c.get('userId')}`, 20]])
+  await guard.fail()
   const b = (await c.req.json().catch(() => ({}))) as Body
   try {
     if (typeof b.session_id === 'string' && /^cs_[A-Za-z0-9_]{1,200}$/.test(b.session_id)) await syncSession(c.env, b.session_id, c.get('userId'))
@@ -378,13 +492,16 @@ app.post('/account/delete', async (c) => {
   const b = await readBody(c)
   const db = c.env.DB
   const uid = c.get('userId')
+  // quem tem só o cookie (aparelho esquecido aberto) não pode ficar chutando a senha
+  const guard = await throttle(c, [[`confirm:${uid}`, 5]])
   const user = await db
     .prepare('SELECT password_hash, password_salt, stripe_subscription_id FROM users WHERE id = ?')
     .bind(uid)
     .first<{ password_hash: string; password_salt: string; stripe_subscription_id: string | null }>()
-  const pass = typeof b.password === 'string' ? b.password : ''
-  if (!user || !safeEqual(await hashPassword(pass, user.password_salt), user.password_hash))
+  if (!user || !(await checkPassword(typedPassword(b, 'password'), user))) {
+    await guard.fail()
     throw new HttpError(403, 'Senha incorreta.')
+  }
   // não deixa uma cobrança correndo para uma conta que não existe mais
   if (c.env.STRIPE_SECRET_KEY && user.stripe_subscription_id) {
     try {
@@ -414,18 +531,21 @@ app.post('/auth/password', async (c) => {
   const b = await readBody(c)
   const db = c.env.DB
   const uid = c.get('userId')
+  const next = password(b, 'next')
+  const guard = await throttle(c, [[`confirm:${uid}`, 5]])
   const user = await db
     .prepare('SELECT password_hash, password_salt FROM users WHERE id = ?')
     .bind(uid)
     .first<{ password_hash: string; password_salt: string }>()
-  const current = typeof b.current === 'string' ? b.current : ''
-  if (!user || !safeEqual(await hashPassword(current, user.password_salt), user.password_hash))
+  if (!user || !(await checkPassword(typedPassword(b, 'current'), user))) {
+    await guard.fail()
     throw new HttpError(403, 'Senha atual incorreta.')
+  }
   const salt = randomHex(16)
   await db.batch([
     db
       .prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?')
-      .bind(await hashPassword(password(b, 'next'), salt), salt, uid),
+      .bind(await hashPassword(next, salt), salt, uid),
     // trocar a senha derruba as outras sessões
     db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(uid),
   ])
@@ -513,6 +633,16 @@ const owned = async (c: Ctx, table: 'entries' | 'cards' | 'purchases' | 'goals' 
   if (!row) throw new HttpError(404, 'Registro não encontrado.')
 }
 
+/** Teto de registros por conta: uso normal não chega nem perto; serve para barrar abuso. */
+const LIMITS = { entries: 2000, cards: 50, purchases: 5000, goals: 100, goal_moves: 5000 } as const
+const underLimit = async (c: Ctx, table: keyof typeof LIMITS) => {
+  const row = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id = ?`)
+    .bind(c.get('userId'))
+    .first<{ n: number }>()
+  if ((row?.n ?? 0) >= LIMITS[table])
+    throw new HttpError(409, 'Você chegou ao limite de registros deste tipo. Exclua alguns antigos para continuar.')
+}
+
 const monthParam = (c: Ctx): string => {
   const m = c.req.param('month')
   if (!isMonth(m)) throw new HttpError(400, 'Mês inválido.')
@@ -532,7 +662,7 @@ const entryFields = async (c: Ctx, b: Body) => {
   return [
     kind,
     text(b, 'name'),
-    text(b, 'category', { max: 40 }),
+    slug(b, 'category', 40),
     cents(b, 'amount_cents'),
     int(b, 'due_day', 1, 31),
     start,
@@ -544,6 +674,7 @@ const entryFields = async (c: Ctx, b: Body) => {
 }
 
 app.post('/entries', async (c) => {
+  await underLimit(c, 'entries')
   const f = await entryFields(c, await readBody(c))
   const id = crypto.randomUUID()
   await c.env.DB.prepare(
@@ -641,6 +772,7 @@ const cardFields = (b: Body) => {
 }
 
 app.post('/cards', async (c) => {
+  await underLimit(c, 'cards')
   const f = cardFields(await readBody(c))
   const id = crypto.randomUUID()
   await c.env.DB.prepare(
@@ -707,7 +839,7 @@ const purchaseFields = async (c: Ctx, b: Body) => {
   return [
     cardId,
     text(b, 'description'),
-    text(b, 'category', { max: 40 }),
+    slug(b, 'category', 40),
     cents(b, 'amount_cents', 1),
     recurring ? 1 : int(b, 'installments', 1, 120),
     recurring ? 1 : 0,
@@ -718,6 +850,7 @@ const purchaseFields = async (c: Ctx, b: Body) => {
 }
 
 app.post('/purchases', async (c) => {
+  await underLimit(c, 'purchases')
   const f = await purchaseFields(c, await readBody(c))
   const id = crypto.randomUUID()
   await c.env.DB.prepare(
@@ -750,9 +883,10 @@ app.delete('/purchases/:id', async (c) => {
 // ---------- reserva e metas ----------
 
 const goalFields = (b: Body) =>
-  [text(b, 'name', { max: 60 }), text(b, 'icon', { max: 30 }), cents(b, 'target_cents'), optMonth(b, 'deadline')] as const
+  [text(b, 'name', { max: 60 }), slug(b, 'icon', 30), cents(b, 'target_cents'), optMonth(b, 'deadline')] as const
 
 app.post('/goals', async (c) => {
+  await underLimit(c, 'goals')
   const f = goalFields(await readBody(c))
   const id = crypto.randomUUID()
   await c.env.DB.prepare(
@@ -788,6 +922,7 @@ app.delete('/goals/:id', async (c) => {
 app.post('/goals/:id/moves', async (c) => {
   const goalId = c.req.param('id')
   await owned(c, 'goals', goalId)
+  await underLimit(c, 'goal_moves')
   const b = await readBody(c)
   const amount = int(b, 'amount_cents', -MAX_CENTS, MAX_CENTS)
   if (amount === 0) throw new HttpError(400, 'Informe um valor.')

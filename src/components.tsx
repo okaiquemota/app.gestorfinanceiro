@@ -30,9 +30,11 @@ export const daysUntil = (iso: string, today = new Date()): number => {
 
 /** Marcar paga/abrir detalhes de uma conta ou fatura, com a tela reagindo na hora. */
 export const usePayableActions = () => {
-  const { run, openForm, state, celebrate } = useStore()
+  const { run, openForm, state, celebrate, readonly, openPaywall } = useStore()
 
   const setPaid = (p: Payable, paid: boolean) => {
+    // só consulta: nem comemora nem mexe na tela, já explica o porquê
+    if (readonly) return openPaywall()
     const paidAt = paid ? toISODate(new Date()) : null
     if (paid) {
       // era a última conta em aberto do mês? então é festa; senão, só a moedinha

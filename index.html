@@ -15,14 +15,7 @@
     <title>Poupin</title>
     <meta name="apple-mobile-web-app-title" content="Poupin" />
     <meta name="application-name" content="Poupin" />
-    <script>
-      // aplica o tema antes de pintar, pra não piscar claro/escuro
-      try {
-        var t = localStorage.getItem('gf-theme')
-        if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-        document.documentElement.dataset.theme = t
-      } catch (e) {}
-    </script>
+    <script src="/theme.js"></script>
   </head>
   <body>
     <div id="root"></div>
