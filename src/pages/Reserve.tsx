@@ -200,8 +200,10 @@ function AchievementsPanel() {
   const ordered = [...list.filter((a) => !a.secret || a.done), ...list.filter((a) => a.secret && !a.done)]
   const locked = list.filter((a) => a.secret && !a.done).length
 
-  const finish = (id: string, title: string) =>
-    run(() => api('POST', `/challenges/${id}/done`, { done: true })).then((ok) => ok && celebrate(`Conquista: ${title}!`))
+  const finish = (c: (typeof mine)[number]) =>
+    run(() => api('POST', `/challenges/${c.id}/done`, { done: true })).then(
+      (ok) => ok && celebrate({ kind: 'achievement', title: c.title, text: c.text, emoji: c.icon, mine: true }),
+    )
 
   return (
     <Panel className="fit-scroll p-4 sm:p-6">
@@ -250,7 +252,7 @@ function AchievementsPanel() {
                   </span>
                 </button>
                 {!c.done_at && (
-                  <Button variant="primary" className="shrink-0" onClick={() => finish(c.id, c.title)}>
+                  <Button variant="primary" className="shrink-0" onClick={() => finish(c)}>
                     Concluí!
                   </Button>
                 )}

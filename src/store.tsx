@@ -6,6 +6,14 @@ import { currentMonth } from './lib/format.ts'
 import { setupSeen } from './Setup.tsx'
 import type { ToastData } from './ui.tsx'
 
+/**
+ * Comemoração: uma frase rápida (some sozinha) ou uma conquista, que abre a
+ * telinha própria dela e fica até a pessoa fechar.
+ */
+export type Celebration =
+  | string
+  | { kind: 'achievement'; title: string; text: string; emoji: string; secret?: boolean; mine?: boolean }
+
 export type FormSpec =
   | { type: 'entry'; kind: EntryKind; entry?: Entry; preset?: Partial<Entry> }
   | { type: 'occurrence'; entryId: string; month: string }
@@ -47,8 +55,8 @@ type Store = {
   closePaywall: () => void
   reload: () => Promise<void>
   /** Comemoração em tela cheia (confete + Poupin), com a frase a mostrar. */
-  celebration: string | null
-  celebrate: (text: string) => void
+  celebration: Celebration | null
+  celebrate: (c: Celebration) => void
   endCelebration: () => void
   theme: Theme
   setTheme: (t: Theme) => void
@@ -83,7 +91,7 @@ export function StoreProvider({
     () => initial.entries.length === 0 && !setupSeen(initial.user.id) && initial.user.billing.access === 'full',
   )
   const [paywall, setPaywall] = useState(false)
-  const [celebration, setCelebration] = useState<string | null>(null)
+  const [celebration, setCelebration] = useState<Celebration | null>(null)
   const endCelebration = useCallback(() => setCelebration(null), [])
   const [toast, setToast] = useState<ToastData | null>(null)
   const [theme, setThemeState] = useState<Theme>(

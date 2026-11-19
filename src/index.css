@@ -632,3 +632,25 @@ html::-webkit-scrollbar,
 [data-fit] .scroll-thin {
   overflow-x: hidden !important;
 }
+
+/* brilho girando atrás do ícone da conquista */
+.achievement-glow::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  z-index: -1;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, #7c3aed55, #f5b40066, #16a34a44, #e879a666, #7c3aed55);
+  filter: blur(10px);
+  animation: glow-spin 4s linear infinite;
+}
+@keyframes glow-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .achievement-glow::before {
+    animation: none;
+  }
+}

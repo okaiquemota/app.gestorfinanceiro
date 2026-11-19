@@ -65,33 +65,39 @@ function NavItem({ href, label, icon: Icon, active }: { href: string; label: str
   )
 }
 
+/**
+ * A linha "Tema" inteira é o botão: clicar em qualquer ponto dela alterna entre
+ * claro e escuro (antes só os dois ícones de 28px respondiam ao clique).
+ */
 function ThemeSwitch() {
   const { theme, setTheme } = useStore()
+  const dark = theme === 'dark'
   return (
-    <div role="radiogroup" aria-label="Tema" className="flex rounded-full bg-sunken p-0.5">
-      {(
-        [
-          { id: 'light', label: 'Tema claro', icon: Sun },
-          { id: 'dark', label: 'Tema escuro', icon: Moon },
-        ] as const
-      ).map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          type="button"
-          role="radio"
-          aria-checked={theme === id}
-          aria-label={label}
-          title={label}
-          onClick={() => setTheme(id)}
-          className={cx(
-            'flex size-7 items-center justify-center rounded-full transition-colors',
-            theme === id ? 'bg-surface text-fg shadow-card' : 'text-faint hover:text-fg',
-          )}
-        >
-          <Icon size={14} />
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={dark}
+      aria-label="Tema escuro"
+      onClick={() => setTheme(dark ? 'light' : 'dark')}
+      className="group flex min-h-11 w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-muted hover:bg-sunken hover:text-fg"
+    >
+      <span className="flex items-center gap-3">
+        {dark ? <Moon size={16} /> : <Sun size={16} />} Tema {dark ? 'escuro' : 'claro'}
+      </span>
+      <span aria-hidden className="flex rounded-full bg-sunken p-0.5 group-hover:bg-line">
+        {([Sun, Moon] as const).map((Icon, i) => (
+          <span
+            key={i}
+            className={cx(
+              'flex size-7 items-center justify-center rounded-full transition-colors',
+              (i === 1) === dark ? 'bg-surface text-fg shadow-card' : 'text-faint',
+            )}
+          >
+            <Icon size={14} />
+          </span>
+        ))}
+      </span>
+    </button>
   )
 }
 
@@ -145,10 +151,7 @@ function Sidebar({ path }: { path: string }) {
             <span className="block font-normal text-muted">Ver assinatura</span>
           </Link>
         )}
-        <div className="flex items-center justify-between px-3 py-3">
-          <span className="flex items-center gap-3 text-sm text-muted">
-            <Sun size={16} /> Tema
-          </span>
+        <div className="py-1">
           <ThemeSwitch />
         </div>
         <Link
@@ -445,7 +448,7 @@ export function Layout({ children }: { children: ReactNode }) {
     const last = fresh[fresh.length - 1]
     const label = last.secret ? 'Conquista secreta' : 'Conquista'
     if (partying.current) notify(`${label} desbloqueada: ${last.title}`, 'success')
-    else celebrate(`${label}: ${last.title}!`)
+    else celebrate({ kind: 'achievement', title: last.title, text: last.text, emoji: last.emoji, secret: last.secret })
   }, [unlocked, celebrate, notify, state.user.id])
   const page = PAGE_NAMES[path] ?? 'Visão geral'
   const main = useRef<HTMLElement>(null)
