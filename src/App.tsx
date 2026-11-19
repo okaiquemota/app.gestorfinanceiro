@@ -57,7 +57,7 @@ export function App() {
   const [boot, setBoot] = useState<Boot>({ phase: 'loading' })
   const path = usePath()
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (retry = true): Promise<void> => {
     try {
       const [status, plan] = await Promise.all([
         api<{ authenticated: boolean }>('GET', '/auth/status'),
@@ -66,7 +66,8 @@ export function App() {
       if (!status.authenticated) return setBoot({ phase: 'public', plan })
       setBoot({ phase: 'ready', state: await api<AppState>('GET', '/state'), plan })
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return load()
+      // a sessão caiu entre as duas chamadas: tenta uma vez de novo (sem laço infinito)
+      if (e instanceof ApiError && e.status === 401 && retry) return load(false)
       setBoot({ phase: 'error', message: e instanceof Error ? e.message : 'Não foi possível carregar.' })
     }
   }, [])
@@ -86,6 +87,12 @@ export function App() {
       path === '/termos' ? 'Termos de uso · Poupin' : path === '/privacidade' ? 'Privacidade · Poupin' : 'Poupin · Um mês na vida do seu dinheiro'
   }, [boot.phase, path])
 
+  // já logado e numa rota de login/cadastro: vai pro app
+  const authRouteWhileIn = boot.phase === 'ready' && !!AUTH_ROUTES[path]
+  useEffect(() => {
+    if (authRouteWhileIn) navigate('/')
+  }, [authRouteWhileIn])
+
   if (boot.phase === 'loading')
     return (
       <div className="flex min-h-(--app-vh) items-center justify-center" role="status" aria-label="Carregando">
@@ -97,7 +104,7 @@ export function App() {
     return (
       <div className="flex min-h-(--app-vh) flex-col items-center justify-center gap-3 px-6 text-center">
         <p className="text-muted">{boot.message}</p>
-        <Button variant="primary" onClick={load}>
+        <Button variant="primary" onClick={() => load()}>
           Tentar de novo
         </Button>
       </div>
@@ -109,12 +116,9 @@ export function App() {
 
   if (boot.phase === 'public') {
     const mode = AUTH_ROUTES[path]
-    if (mode) return <Auth key={mode} mode={mode} trialDays={boot.plan.trial_days} onDone={load} />
+    if (mode) return <Auth key={mode} mode={mode} trialDays={boot.plan.trial_days} onDone={() => load()} />
     return <Landing plan={boot.plan} />
   }
-
-  // já logado e numa rota de login/cadastro: vai pro app
-  if (AUTH_ROUTES[path]) navigate('/')
 
   const Page = PAGES[path] ?? Dashboard
   return (

@@ -5,7 +5,7 @@ import { api } from '../lib/api.ts'
 import { playCoin, setSoundOn, soundOn } from '../lib/fun.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
-import { Badge, Button, Emoji, Field, Panel, Segmented, TextInput, Toggle } from '../ui.tsx'
+import { Badge, Button, Emoji, Field, PasswordInput, Panel, Segmented, TextInput, Toggle } from '../ui.tsx'
 
 export function Settings() {
   const { state, run, theme, setTheme, logout, notify, openSetup } = useStore()
@@ -98,10 +98,10 @@ export function Settings() {
             }}
           >
             <Field label="Senha atual">
-              <TextInput type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+              <PasswordInput autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
             </Field>
             <Field label="Nova senha" hint="Pelo menos 8 caracteres. Trocar a senha desconecta os outros aparelhos.">
-              <TextInput type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} minLength={8} />
+              <PasswordInput autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} minLength={8} maxLength={200} />
             </Field>
             <Button type="submit" disabled={busy || !current || next.length < 8}>
               {busy ? 'Trocando…' : 'Trocar senha'}
@@ -216,8 +216,7 @@ function DeleteAccountPanel() {
           }}
         >
           <Field label="Confirme com a sua senha">
-            <TextInput
-              type="password"
+            <PasswordInput
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

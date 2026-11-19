@@ -201,7 +201,7 @@ export const applySession = async (env: BillingEnv, session: Json, onlyUser?: st
   if (session.payment_status !== 'paid') return false
   const period: Period = (session.metadata as Json | undefined)?.period === 'year' ? 'year' : 'month'
   // valor conferido no servidor: ninguém libera um período pagando menos do que ele custa
-  if (typeof session.amount_subtotal !== 'number' || session.amount_subtotal < periodCents(env, period)) return false
+  if (session.currency !== 'brl' || typeof session.amount_subtotal !== 'number' || session.amount_subtotal < periodCents(env, period)) return false
   const user = await db.prepare('SELECT paid_until FROM users WHERE id = ?').bind(userId).first<{ paid_until: string | null }>()
   if (!user) return false
 

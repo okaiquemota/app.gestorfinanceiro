@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api } from '../lib/api.ts'
 import { Link, navigate } from '../router.tsx'
 import { PublicShell } from './Public.tsx'
-import { Emoji, Field, TextInput } from '../ui.tsx'
+import { Emoji, Field, PasswordInput, TextInput } from '../ui.tsx'
 
 export type AuthMode = 'login' | 'signup' | 'forgot' | 'reset'
 
@@ -27,7 +27,14 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
+  // O token do link de nova senha sai da barra de endereço assim que a tela abre:
+  // não fica no histórico, em print de tela nem em quem olhar por cima do ombro.
+  const [token] = useState(() => (mode === 'reset' ? (new URLSearchParams(window.location.search).get('token') ?? '') : ''))
+  useEffect(() => {
+    if (mode === 'reset' && window.location.search) window.history.replaceState(null, '', window.location.pathname)
+  }, [mode])
   const copy = COPY[mode]
+  const missingToken = mode === 'reset' && !/^[0-9a-f]{64}$/.test(token)
 
   const submit = async () => {
     if (mode === 'signup' && !accept) return setError('Para criar a conta é preciso aceitar os termos e a política de privacidade.')
@@ -42,7 +49,6 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
         setBusy(false)
         return
       } else {
-        const token = new URLSearchParams(window.location.search).get('token') ?? ''
         await api('POST', '/auth/reset', { token, password })
       }
       navigate('/')
@@ -87,7 +93,17 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
           </p>
         </div>
 
-        {sent ? (
+        {missingToken ? (
+          <div role="alert" className="box mt-6 space-y-3 p-5 text-center shadow-[6px_6px_0_var(--ink)] sm:p-6">
+            <p className="font-semibold">Este link não está completo</p>
+            <p className="text-muted">
+              Abra o link direto do e-mail, sem cortar nenhum pedaço. Se não funcionar, peça um link novo.
+            </p>
+            <Link href="/recuperar-senha" className="btn-ink h-12 w-full text-base">
+              Pedir um link novo
+            </Link>
+          </div>
+        ) : sent ? (
           <div role="status" className="mt-6 rounded-panel border border-line bg-surface p-5 text-center shadow-card sm:p-6">
             <p className="font-semibold">Confira seu e-mail</p>
             <p className="mt-1 text-muted">
@@ -121,8 +137,7 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
             )}
             {mode !== 'forgot' && (
               <Field label={mode === 'reset' ? 'Nova senha' : 'Senha'} hint={mode === 'login' ? undefined : 'Pelo menos 8 caracteres.'}>
-                <TextInput
-                  type="password"
+                <PasswordInput
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
@@ -163,6 +178,14 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
             {error && (
               <p role="alert" className="rounded-xl bg-bad-soft px-3 py-2 text-sm font-semibold text-bad">
                 {error}
+                {mode === 'reset' && /expirou/.test(error) && (
+                  <>
+                    {' '}
+                    <Link href="/recuperar-senha" className="underline underline-offset-2">
+                      Pedir um link novo
+                    </Link>
+                  </>
+                )}
               </p>
             )}
             <button type="submit" className="btn-ink h-13 w-full text-base disabled:opacity-60" disabled={busy}>

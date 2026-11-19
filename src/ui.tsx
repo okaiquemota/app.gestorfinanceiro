@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes } from 'react'
-import { Check, CircleAlert, X } from 'lucide-react'
+import { Check, CircleAlert, Eye, EyeOff, X } from 'lucide-react'
 import { monthNames, monthParts, splitBRL } from './lib/format.ts'
 
 export const cx = (...parts: (string | false | null | undefined)[]): string =>
@@ -342,6 +342,26 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cx(INPUT, props.className)} />
 }
 
+/** Campo de senha com botão de mostrar/esconder (ajuda muito no celular). */
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [shown, setShown] = useState(false)
+  return (
+    <span className="relative block">
+      <input {...props} type={shown ? 'text' : 'password'} className={cx(INPUT, 'pr-12', props.className)} />
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        aria-label={shown ? 'Esconder senha' : 'Mostrar senha'}
+        aria-pressed={shown}
+        title={shown ? 'Esconder senha' : 'Mostrar senha'}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-faint hover:text-fg"
+      >
+        {shown ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
+    </span>
+  )
+}
+
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={cx(INPUT, 'field', props.className)} />
 }
@@ -396,7 +416,8 @@ export function MoneyInput({
         aria-label={ariaLabel}
         value={value}
         onChange={(e) => {
-          const digits = e.target.value.replace(/\D/g, '').slice(0, 12)
+          // até R$ 999.999.999,99: o teto que o servidor aceita
+          const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
           onChange(digits ? parseInt(digits, 10) : 0)
         }}
         onFocus={caretToEnd}

@@ -30,7 +30,12 @@ type Store = {
     opts?: { patch?: (s: AppState) => AppState; success?: string },
   ) => Promise<boolean>
   form: FormSpec | null
+  /** Abre um formulário; com o acesso só de consulta, mostra o aviso de assinatura no lugar. */
   openForm: (f: FormSpec) => void
+  /** Teste encerrado sem assinatura: dá pra ver, não pra alterar. */
+  readonly: boolean
+  /** Mostra o aviso de assinatura. */
+  openPaywall: () => void
   closeForm: () => void
   /** Configuração inicial (passo a passo do primeiro acesso). */
   setupOpen: boolean
@@ -73,7 +78,9 @@ export function StoreProvider({
   const [month, setMonth] = useState(currentMonth)
   const [form, setForm] = useState<FormSpec | null>(null)
   // Abre sozinha só no primeiro acesso: nada cadastrado e ainda não vista neste aparelho.
-  const [setupOpen, setSetupOpen] = useState(() => initial.entries.length === 0 && !setupSeen())
+  const [setupOpen, setSetupOpen] = useState(
+    () => initial.entries.length === 0 && !setupSeen(initial.user.id) && initial.user.billing.access === 'full',
+  )
   const [paywall, setPaywall] = useState(false)
   const [celebration, setCelebration] = useState<string | null>(null)
   const endCelebration = useCallback(() => setCelebration(null), [])
@@ -158,6 +165,15 @@ export function StoreProvider({
     onSignedOut()
   }, [onSignedOut])
 
+  const readonly = state.user.billing.access === 'readonly'
+  const openForm = useCallback(
+    (f: FormSpec) => {
+      if (readonly) return setPaywall(true)
+      setForm(f)
+    },
+    [readonly],
+  )
+
   const value = useMemo<Store>(
     () => ({
       state,
@@ -165,7 +181,9 @@ export function StoreProvider({
       setMonth,
       run,
       form,
-      openForm: setForm,
+      openForm,
+      readonly,
+      openPaywall: () => setPaywall(true),
       closeForm: () => setForm(null),
       setupOpen,
       openSetup: () => setSetupOpen(true),
@@ -183,7 +201,7 @@ export function StoreProvider({
       dismissToast,
       logout,
     }),
-    [state, month, run, form, setupOpen, paywall, reload, celebration, endCelebration, theme, setTheme, toast, notify, dismissToast, logout],
+    [state, month, run, form, openForm, readonly, setupOpen, paywall, reload, celebration, endCelebration, theme, setTheme, toast, notify, dismissToast, logout],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
