@@ -299,11 +299,32 @@ function Walker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [desktop, sayKey, pos?.x, pos?.y])
 
-  // no celular ele fica no canto e a tela rola até a parte que ele está explicando
+  // no celular ele fica embaixo e a tela rola até a parte que ele explica
+  // ficar no alto da tela, inteira à vista acima dele
   useEffect(() => {
     if (desktop || line.spot === 'hero') return
-    targets[line.spot].current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [desktop, line.spot, targets])
+    const el = targets[line.spot].current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const dock = dockBox.current?.offsetHeight ?? 160
+    const room = window.innerHeight - dock - 24
+    // já está toda à vista? não mexe
+    if (r.top >= 12 && r.bottom <= room) return
+    window.scrollTo({ top: window.scrollY + r.top - 16, behavior: 'smooth' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desktop, line.spot])
+
+  // fora do passeio, a fala recolhe sozinha depois de um tempo; um toque no
+  // Poupin mostra de novo
+  const dockBox = useRef<HTMLDivElement>(null)
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => {
+    setCollapsed(false)
+    if (desktop || line.actions) return
+    const t = window.setTimeout(() => setCollapsed(true), 5000)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desktop, sayKey])
 
   /** Balão de fala: cauda apontando pro Poupin, do lado em que ele está. */
   const bubble = (tail: 'l' | 'r', low?: boolean) => (
@@ -336,9 +357,25 @@ function Walker({
   if (!desktop && line.spot === 'hero') return null
   if (!desktop)
     return (
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex items-end gap-1 px-3 pb-3">
-        <div className="pointer-events-auto min-w-0 flex-1 pb-3 pr-2">{bubble('r', true)}</div>
-        <div className="w-[92px] shrink-0 [&_img]:!h-auto [&_img]:!w-[92px]">{body}</div>
+      <div
+        ref={dockBox}
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(12px,env(safe-area-inset-bottom))]"
+      >
+        {/* esmaecido atrás da fala, pra ela não brigar com o conteúdo de trás */}
+        {!collapsed && <div aria-hidden className="absolute inset-x-0 bottom-0 -z-10 h-[115%] bg-gradient-to-t from-bg via-bg/85 to-transparent" />}
+        <div className="mx-auto flex max-w-md items-end gap-2">
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? 'Mostrar a fala do Poupin' : 'Esconder a fala do Poupin'}
+            aria-expanded={!collapsed}
+            className="pointer-events-auto relative w-[78px] shrink-0 [&_img]:!h-auto [&_img]:!w-[78px]"
+          >
+            {body}
+            {collapsed && <span aria-hidden className="absolute right-1 top-1 size-3.5 rounded-full border-2 border-surface bg-primary" />}
+          </button>
+          {!collapsed && <div className="pointer-events-auto min-w-0 flex-1 pb-4">{bubble('l', true)}</div>}
+        </div>
       </div>
     )
 
@@ -706,7 +743,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
   const focus = (s: Spot) =>
     cx(
       'transition-[opacity,box-shadow,transform] duration-500',
-      touring && !reaction && line.spot !== s && desktop && 'opacity-45',
+      touring && !reaction && line.spot !== s && 'opacity-45',
       line.spot === s && 'ring-2 ring-primary/70 shadow-pop',
     )
 
@@ -811,9 +848,10 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
           </div>
 
         <div className="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-12 lg:gap-5">
-          <div className="flex min-h-0 flex-col gap-4 lg:col-span-7 lg:gap-5">
+          {/* no celular as colunas se desfazem e os cards seguem a ordem do passeio */}
+          <div className="max-lg:contents lg:col-span-7 lg:flex lg:min-h-0 lg:flex-col lg:gap-5">
             {/* a sobra */}
-            <Panel className={cx('relative flex flex-col justify-center p-5 sm:p-6 lg:flex-1', focus('left'))}>
+            <Panel className={cx('relative flex flex-col justify-center p-5 max-lg:order-1 sm:p-6 lg:flex-1', focus('left'))}>
               <section ref={targets.left} className="absolute inset-0" aria-hidden />
               <p className="text-lead font-semibold">Quanto sobra no fim do mês</p>
               <p className={cx('tnum mt-2 whitespace-nowrap text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-none tracking-[-0.045em]', tone)}>
@@ -840,9 +878,9 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
               </div>
             </Panel>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:gap-5">
+            <div className="max-lg:contents lg:grid lg:grid-cols-2 lg:gap-5">
               {/* o que entra */}
-              <Panel className={cx('p-5', focus('salary'))}>
+              <Panel className={cx('p-5 max-lg:order-2', focus('salary'))}>
                 <section ref={targets.salary}>
                   <p className="text-lead font-semibold">O que entra</p>
                   <p className="tnum mt-2 text-3xl font-semibold tracking-[-0.03em]">{bigMoney(salary)}</p>
@@ -867,7 +905,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
               </Panel>
 
               {/* o cartão */}
-              <Panel className={cx('p-5', focus('card'))}>
+              <Panel className={cx('p-5 max-lg:order-4', focus('card'))}>
                 <section ref={targets.card}>
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="text-lead font-semibold">Fatura do cartão</p>
@@ -884,7 +922,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
           </div>
 
           {/* as contas */}
-          <Panel className={cx('flex min-h-0 flex-col p-5 lg:col-span-5', focus('bills'))}>
+          <Panel className={cx('flex min-h-0 flex-col p-5 max-lg:order-3 lg:col-span-5', focus('bills'))}>
             <section ref={targets.bills} className="flex min-h-0 flex-1 flex-col">
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-lead font-semibold">Contas do mês</p>
