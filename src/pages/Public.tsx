@@ -262,6 +262,30 @@ function Walker({
     }
   }, [desktop, place])
 
+  // no computador a tela acompanha: se ele ou o balão ficarem fora da janela
+  // (tela baixa), rola só o necessário pra mostrar os dois. Espera a descida
+  // da abertura terminar pra não brigar com ela.
+  const bubbleBox = useRef<HTMLDivElement>(null)
+  const sayKey = line.spot + String(typeof line.text === 'string' ? line.text : line.pose)
+  useEffect(() => {
+    if (!desktop || line.spot === 'hero' || !pos) return
+    const t = window.setTimeout(() => {
+      const s = stage.current?.getBoundingClientRect()
+      const b = bubbleBox.current
+      if (!s) return
+      const bTop = b ? b.offsetTop : 0
+      const bBottom = b ? b.offsetTop + b.offsetHeight : MASCOT
+      const top = s.top + pos.y + Math.min(0, bTop)
+      const bottom = s.top + pos.y + Math.max(MASCOT, bBottom)
+      const margin = 16
+      if (top < margin) window.scrollBy({ top: top - margin, behavior: 'smooth' })
+      else if (bottom > window.innerHeight - margin)
+        window.scrollBy({ top: Math.min(bottom - window.innerHeight + margin, top - margin), behavior: 'smooth' })
+    }, 750)
+    return () => window.clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [desktop, sayKey, pos?.x, pos?.y])
+
   // no celular ele fica no canto e a tela rola até a parte que ele está explicando
   useEffect(() => {
     if (desktop || line.spot === 'hero') return
@@ -316,6 +340,7 @@ function Walker({
     >
       {body}
       <div
+        ref={bubbleBox}
         style={cfg.big ? { left: MASCOT / 2 + MASCOT * heroScale * 0.4, bottom: MASCOT * heroScale * 0.42 } : undefined}
         className={cx(
           'pointer-events-auto absolute w-[300px]',
@@ -539,24 +564,30 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
   const line = reaction ?? (touring ? script[step] : idle)
 
   // ---- reações ----
-  const timer = useRef(0)
-  const react = (l: Line, keep = 4200) => {
-    window.clearTimeout(timer.current)
+  // Uma reação fica no balão até a próxima coisa acontecer: ele não volta a
+  // repetir a fala anterior. No passeio, "Continuar" segue pra próxima parte.
+  const turn = useRef(0)
+  /** Varia a frase a cada reação, pra ele não falar sempre igual. */
+  const pick = (options: string[]) => options[turn.current++ % options.length]
+  const react = (l: Line) => {
     setReaction(
       touring
         ? {
             ...l,
             actions: (
-              <button type="button" onClick={() => setReaction(null)} className={cx(linkButton('secondary'), 'h-9 px-3')}>
-                Continuar o passeio <ArrowRight size={16} />
-              </button>
+              <>
+                <button type="button" onClick={next} className={cx(linkButton('primary'), 'h-9 px-3.5')}>
+                  Continuar o passeio <ArrowRight size={16} />
+                </button>
+                <button type="button" onClick={skip} className="h-9 px-2 text-caption font-medium text-muted hover:text-fg">
+                  Pular
+                </button>
+              </>
             ),
           }
         : l,
     )
-    timer.current = window.setTimeout(() => setReaction(null), keep)
   }
-  useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const toggle = (list: 'bills' | 'card', id: string) => {
     const items = list === 'bills' ? bills : buys
@@ -564,6 +595,9 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
     if (!item) return
     const after = left + (item.on ? item.cents : -item.cents)
     const m = moodOf(salary, after)
+    const name = item.name.toLowerCase()
+    const v = brl(item.cents)
+    const rest = after < 0 ? `falta ${brl(-after)}` : `sobram ${brl(after)}`
     const set = list === 'bills' ? setBills : setBuys
     set(items.map((i) => (i.id === id ? { ...i, on: !i.on } : i)))
     if (item.on)
@@ -572,17 +606,25 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
         pose: after >= 0 ? (m.pose === 'mascote-preocupado' ? 'mascote' : 'mascote-festa') : 'mascote-preocupado',
         text:
           after >= 0 && left < 0
-            ? `Ufa! Sem ${item.name.toLowerCase()} o mês volta pro azul.`
-            : `Sem ${item.name.toLowerCase()}, sobram mais ${brl(item.cents)}. Agora fica em ${brl(after)}.`,
+            ? `Ufa! Sem ${name}, o mês volta pro azul: ${rest}.`
+            : pick([
+                `Sem ${name}, ficam mais ${v} no bolso. Agora ${rest}.`,
+                `${item.name} fora! São ${v} a mais no fim do mês.`,
+                `Tirei ${name} da conta. Com isso, ${rest}.`,
+              ]),
       })
     else
       react({
         spot: list,
-        pose: after < 0 ? 'mascote-preocupado' : m.pose === 'mascote-preocupado' ? 'mascote-preocupado' : 'mascote',
+        pose: after < 0 || m.pose === 'mascote-preocupado' ? 'mascote-preocupado' : 'mascote',
         text:
           after < 0 && left >= 0
-            ? `Ih! Com ${item.name.toLowerCase()}, o mês fecha no vermelho: falta ${brl(-after)}.`
-            : `${item.name} entrou: lá se vão ${brl(item.cents)}. Sobra ${after < 0 ? `negativa de ${brl(-after)}` : brl(after)}.`,
+            ? `Ih! Com ${name}, o mês fecha no vermelho: falta ${brl(-after)}.`
+            : pick([
+                `${item.name} entrou: lá se vão ${v}. Agora ${rest}.`,
+                `Coloquei ${name} de volta. São ${v} a menos.`,
+                `Mais ${v} com ${name}. Com isso, ${rest}.`,
+              ]),
       })
   }
 
@@ -593,21 +635,27 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
     salaryTimer.current = window.setTimeout(() => {
       const l = v - billsTotal - cardTotal
       const m = moodOf(v, l)
+      const in_ = brlRound(v)
       react({
         spot: 'salary',
         pose: m.pose,
         text:
-          l < 0
-            ? `Com ${brlRound(v)} entrando, faltam ${brl(-l)} no fim do mês. Melhor saber agora, né?`
-            : m.tone === 'good'
-              ? `Com ${brlRound(v)}, sobram ${brl(l)}. Dá até pra guardar um pouco!`
-              : `Com ${brlRound(v)}, sobram ${brl(l)}. Apertadinho, mas fecha.`,
+          v <= 0
+            ? 'Sem nada entrando, não tem mês que feche. Bota um salário aí!'
+            : l < 0
+              ? pick([
+                  `Com ${in_} entrando, faltam ${brl(-l)} no fim do mês. Melhor saber agora, né?`,
+                  `${in_} não cobre tudo: o mês fecha ${brl(-l)} no vermelho.`,
+                ])
+              : m.tone === 'good'
+                ? pick([`Com ${in_}, sobram ${brl(l)}. Dá até pra guardar um pouco!`, `Opa, ${in_}! Assim sobram ${brl(l)} no fim do mês.`])
+                : pick([`Com ${in_}, sobram ${brl(l)}. Apertadinho, mas fecha.`, `${in_} entrando: fecha com ${brl(l)} de folga. Pouca, mas fecha.`]),
       })
     }, 350)
   }
+  useEffect(() => () => window.clearTimeout(salaryTimer.current), [])
 
   const askFaq = () => {
-    window.clearTimeout(timer.current)
     setReaction({
       spot: 'faq',
       pose: 'mascote-oi',
@@ -617,7 +665,6 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
           key={q}
           type="button"
           onClick={() => {
-            window.clearTimeout(timer.current)
             setReaction({
               spot: 'faq',
               pose: 'mascote',
@@ -733,10 +780,10 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
           <button
             type="button"
             onClick={goDown}
-            className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 text-caption font-medium text-muted hover:text-fg"
+            aria-label="Descer pro mês de exemplo"
+            className="absolute bottom-4 left-1/2 flex size-11 -translate-x-1/2 items-center justify-center rounded-full text-muted hover:text-fg"
           >
-            role pra ver
-            <ArrowDown size={18} className="nudge" />
+            <ArrowDown size={24} className="nudge" />
           </button>
         </section>
 
