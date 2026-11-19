@@ -171,7 +171,7 @@ type Line = {
 }
 
 const MASCOT = 132
-/** Na abertura ele é o centro do site: bem maior que no resto do passeio. */
+/** Na abertura ele é o centro do site: bem maior que no resto do passeio (no máximo isto). */
 const HERO_SCALE = 2.5
 
 /**
@@ -192,10 +192,9 @@ function anchor(spot: Spot, r: DOMRect, stage: DOMRect): { x: number; y: number 
   const x = r.left - stage.left
   const y = r.top - stage.top
   const c = SPOTS[spot].corner
-  // na abertura ele fica grande, na frente do canto de baixo do print, apresentando o app
   // na abertura ele fica no centro do palco, grande, apresentando
   if (c === 'present') return { x: x + r.width / 2 - MASCOT / 2, y: y + r.height - MASCOT }
-  if (c === 'above') return { x: x + r.width - MASCOT * 0.9, y: y - MASCOT + 26 }
+  if (c === 'above') return { x: x + r.width - MASCOT * 0.9, y: y - MASCOT - 6 }
   if (c === 'tl') return { x: x - MASCOT * 0.8, y: y - MASCOT * 0.74 }
   return { x: x + r.width - MASCOT * 0.72, y: y - MASCOT * 0.56 }
 }
@@ -216,7 +215,7 @@ function Walker({
   const [facingLeft, setFacingLeft] = useState(false)
   const [duration, setDuration] = useState(1.1)
   const last = useRef<{ x: number; y: number } | null>(null)
-  const entered = useRef(false)
+  const [heroScale, setHeroScale] = useState(HERO_SCALE)
 
   const place: () => void = useCallback(() => {
     const s = stage.current?.getBoundingClientRect()
@@ -230,14 +229,8 @@ function Walker({
     const p = anchor(line.spot, t, s)
     p.x = Math.max(0, Math.min(s.width - MASCOT, p.x))
     p.y = Math.max(0, p.y)
-    // na primeira vez ele entra andando pela esquerda
-    if (!last.current && !entered.current) {
-      entered.current = true
-      last.current = { x: 0, y: p.y }
-      setPos(last.current)
-      requestAnimationFrame(() => requestAnimationFrame(() => place()))
-      return
-    }
+    // na abertura o tamanho dele acompanha o palco (telas baixas, notebook)
+    if (SPOTS[line.spot].big) setHeroScale(Math.min(HERO_SCALE, Math.max(1.4, t.height / MASCOT)))
     const prev = last.current
     if (prev && (Math.abs(prev.x - p.x) > 4 || Math.abs(prev.y - p.y) > 4)) {
       // caminho longo (descer da abertura pro mês) leva mais tempo
@@ -281,7 +274,7 @@ function Walker({
       key={String(line.spot) + String(typeof line.text === 'string' ? line.text : '')}
       role="status"
       aria-live="polite"
-      className={cx('speech bubble-in', `tail-${tail}`, low && 'tail-low', SPOTS[line.spot].big ? 'px-6 py-5 text-lg' : 'px-5 py-4 text-[15px]')}
+      className={cx('speech bubble-in', `tail-${tail}`, low && 'tail-low', SPOTS[line.spot].big ? (heroScale < 2.1 ? 'px-5 py-4 text-base' : 'px-6 py-5 text-lg') : 'px-5 py-4 text-[15px]')}
     >
       <div className="font-medium">{line.text}</div>
       {line.actions && <div className="mt-3 flex flex-wrap items-center gap-2">{line.actions}</div>}
@@ -293,7 +286,7 @@ function Walker({
       {!(desktop && SPOTS[line.spot].big) && <span aria-hidden className="absolute inset-x-5 bottom-1 h-3 rounded-full bg-black/15 blur-[6px]" />}
       <div
         className="origin-bottom transition-transform duration-700"
-        style={{ transform: desktop && SPOTS[line.spot].big ? `scale(${HERO_SCALE})` : undefined }}
+        style={{ transform: desktop && SPOTS[line.spot].big ? `scale(${heroScale})` : undefined }}
       >
         <div className={cx(walking && 'waddle')}>
           <Emoji key={line.pose} name={line.pose} size={MASCOT} alt="Poupin" className="pose-in relative drop-shadow-[0_10px_14px_rgb(0_0_0/0.18)]" />
@@ -323,9 +316,10 @@ function Walker({
     >
       {body}
       <div
+        style={cfg.big ? { left: MASCOT / 2 + MASCOT * heroScale * 0.4, bottom: MASCOT * heroScale * 0.42 } : undefined}
         className={cx(
           'pointer-events-auto absolute w-[300px]',
-          cfg.big ? 'bottom-[235px] left-[225px] w-[360px]' : cfg.up ? 'bottom-6' : 'top-2',
+          cfg.big ? 'w-[360px]' : cfg.up ? 'bottom-6' : 'top-2',
           !cfg.big && (bubbleOnLeft ? 'right-[calc(100%+6px)]' : 'left-[calc(100%+6px)]'),
         )}
       >
@@ -691,7 +685,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                     <span className="block text-micro text-muted">a sobra foi refeita</span>
                   </span>
                 </div>
-                <div className="float-a absolute bottom-[8%] right-[7%] w-60 rotate-[3deg] rounded-2xl border border-line bg-surface p-4 shadow-pop">
+                <div className="float-a absolute -bottom-[2%] right-[5%] w-60 rotate-[3deg] rounded-2xl border border-line bg-surface p-4 shadow-pop">
                   <div className="flex items-center gap-2.5">
                     <Emoji name="card" size={30} />
                     <div className="min-w-0 flex-1">
@@ -704,7 +698,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
               </div>
 
               {/* onde ele fica (no computador ele chega andando; no celular aparece aqui mesmo) */}
-              <div ref={targets.hero as RefObject<HTMLDivElement | null>} className="relative h-[clamp(220px,40vh,340px)] w-[clamp(220px,40vh,340px)]">
+              <div ref={targets.hero as RefObject<HTMLDivElement | null>} className="relative h-[clamp(200px,37vh,340px)] w-[clamp(200px,37vh,340px)]">
                 {!desktop && step === 0 && !reaction && (
                   <Emoji key={line.pose} name={line.pose} size={260} alt="Poupin" className="mascot pose-in absolute inset-0 !h-full !w-full drop-shadow-[0_18px_24px_rgb(76_29_149/0.3)]" />
                 )}
@@ -747,7 +741,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
         </section>
 
         {/* ---------- o mês de exemplo, onde ele mostra cada parte ---------- */}
-        <main ref={demo} className="relative isolate mx-auto flex max-w-6xl scroll-mt-0 flex-col px-4 pb-48 pt-6 sm:px-5 lg:h-(--app-vh) lg:pb-5">
+        <main ref={demo} className="relative isolate mx-auto flex max-w-6xl scroll-mt-0 flex-col px-4 pb-48 pt-6 sm:px-5 lg:min-h-(--app-vh) lg:pb-8">
           <div aria-hidden className="stage-dots pointer-events-none absolute inset-0 -z-10" />
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Um mês de exemplo</h2>
