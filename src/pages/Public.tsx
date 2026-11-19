@@ -171,6 +171,8 @@ type Line = {
 }
 
 const MASCOT = 132
+/** Na abertura ele é o centro do site: bem maior que no resto do passeio. */
+const HERO_SCALE = 2.5
 
 /**
  * Onde o Poupin para em cada parte, e pra que lado abre o balão: sempre pro
@@ -191,7 +193,8 @@ function anchor(spot: Spot, r: DOMRect, stage: DOMRect): { x: number; y: number 
   const y = r.top - stage.top
   const c = SPOTS[spot].corner
   // na abertura ele fica grande, na frente do canto de baixo do print, apresentando o app
-  if (c === 'present') return { x: x - MASCOT * 0.15, y: y + r.height - MASCOT * 0.9 }
+  // na abertura ele fica no centro do palco, grande, apresentando
+  if (c === 'present') return { x: x + r.width / 2 - MASCOT / 2, y: y + r.height - MASCOT }
   if (c === 'above') return { x: x + r.width - MASCOT * 0.9, y: y - MASCOT + 26 }
   if (c === 'tl') return { x: x - MASCOT * 0.8, y: y - MASCOT * 0.74 }
   return { x: x + r.width - MASCOT * 0.72, y: y - MASCOT * 0.56 }
@@ -267,7 +270,10 @@ function Walker({
       key={String(line.spot) + String(typeof line.text === 'string' ? line.text : '')}
       role="status"
       aria-live="polite"
-      className="bubble-in rounded-2xl border border-line bg-surface p-4 text-[15px] leading-snug shadow-pop"
+      className={cx(
+        'bubble-in rounded-2xl border border-line bg-surface p-4 leading-snug shadow-pop',
+        SPOTS[line.spot].big ? 'rounded-bl-md p-5 text-lg' : 'text-[15px]',
+      )}
     >
       <div className="font-medium">{line.text}</div>
       {line.actions && <div className="mt-3 flex flex-wrap items-center gap-2">{line.actions}</div>}
@@ -276,10 +282,10 @@ function Walker({
 
   const body = (
     <div className={cx('relative', facingLeft && '-scale-x-100')}>
-      <span aria-hidden className="absolute inset-x-5 bottom-1 h-3 rounded-full bg-black/15 blur-[6px]" />
+      {!(desktop && SPOTS[line.spot].big) && <span aria-hidden className="absolute inset-x-5 bottom-1 h-3 rounded-full bg-black/15 blur-[6px]" />}
       <div
         className="origin-bottom transition-transform duration-700"
-        style={{ transform: desktop && SPOTS[line.spot].big ? 'scale(1.55)' : undefined }}
+        style={{ transform: desktop && SPOTS[line.spot].big ? `scale(${HERO_SCALE})` : undefined }}
       >
         <div className={cx(walking && 'waddle')}>
           <Emoji key={line.pose} name={line.pose} size={MASCOT} alt="Poupin" className="pose-in relative drop-shadow-[0_10px_14px_rgb(0_0_0/0.18)]" />
@@ -288,6 +294,8 @@ function Walker({
     </div>
   )
 
+  // no celular, na abertura, ele aparece grande no próprio palco (ver Landing)
+  if (!desktop && line.spot === 'hero') return null
   if (!desktop)
     return (
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex items-end gap-1 px-3 pb-3">
@@ -309,7 +317,7 @@ function Walker({
       <div
         className={cx(
           'pointer-events-auto absolute w-[300px]',
-          cfg.big ? 'bottom-[150px] left-[60%] w-[330px]' : cfg.up ? 'bottom-6' : 'top-2',
+          cfg.big ? 'bottom-[235px] left-[210px] w-[360px]' : cfg.up ? 'bottom-6' : 'top-2',
           !cfg.big && (bubbleOnLeft ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]'),
         )}
       >
@@ -650,15 +658,66 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
         <section className="relative flex min-h-(--app-vh) flex-col overflow-hidden">
           <div aria-hidden className="intro-glow pointer-events-none absolute inset-0" />
           <Header authenticated={authenticated} />
-          <div className="relative mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 pb-20 pt-4 lg:grid-cols-[0.85fr_1.15fr] lg:pb-24">
-            <div>
-              <h1 className="text-balance text-[clamp(2.4rem,5vw,4rem)] font-semibold leading-[1.03] tracking-[-0.04em]">
+          {/* o palco: luz atrás, pedaços do app flutuando e o Poupin no meio */}
+          <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col items-center justify-center px-5">
+            <div className="relative flex w-full flex-1 items-end justify-center">
+              <div aria-hidden className="spotlight pointer-events-none absolute bottom-0 left-1/2 aspect-square w-[min(620px,120vw)] -translate-x-1/2 translate-y-[18%] rounded-full" />
+              <div aria-hidden className="absolute bottom-1 left-1/2 h-6 w-56 -translate-x-1/2 rounded-full bg-[rgb(76_29_149/0.22)] blur-xl" />
+
+              <div aria-hidden className="pointer-events-none absolute inset-0 hidden lg:block">
+                <div className="float-a absolute left-[6%] top-[14%] w-56 rotate-[-4deg] rounded-2xl border border-line bg-surface p-4 shadow-pop">
+                  <p className="text-caption font-semibold text-muted">Sobra prevista</p>
+                  <p className="tnum mt-1 text-2xl font-semibold tracking-[-0.03em] text-good">{brl(left)}</p>
+                  <div className="mt-2 flex h-2 gap-[2px] overflow-hidden rounded-full">
+                    <span className="rounded-[2px] bg-[var(--s-bills)]" style={{ flexGrow: billsTotal }} />
+                    <span className="rounded-[2px] bg-[var(--s-cards)]" style={{ flexGrow: cardTotal }} />
+                    <span className="rounded-[2px] bg-[var(--s-left)]" style={{ flexGrow: Math.max(0, left) }} />
+                  </div>
+                </div>
+                <div className="float-b absolute bottom-[12%] left-[12%] flex items-center gap-2.5 rounded-2xl border border-line bg-surface py-2.5 pl-2.5 pr-4 shadow-pop">
+                  <span className="flex size-8 items-center justify-center rounded-full bg-good-fill text-white">
+                    <Check size={16} strokeWidth={3} />
+                  </span>
+                  <span>
+                    <span className="block text-caption font-semibold">Aluguel pago</span>
+                    <span className="block text-micro text-muted">a sobra foi refeita</span>
+                  </span>
+                </div>
+                <div className="float-a absolute bottom-[8%] right-[7%] w-60 rotate-[3deg] rounded-2xl border border-line bg-surface p-4 shadow-pop">
+                  <div className="flex items-center gap-2.5">
+                    <Emoji name="card" size={30} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-caption font-semibold">Fatura de dezembro</p>
+                      <p className="text-micro text-muted">fecha dia 12 · 3 compras</p>
+                    </div>
+                  </div>
+                  <p className="tnum mt-2 text-xl font-semibold tracking-[-0.02em]">{brl(cardTotal)}</p>
+                </div>
+              </div>
+
+              {/* onde ele fica (no computador ele chega andando; no celular aparece aqui mesmo) */}
+              <div ref={targets.hero as RefObject<HTMLDivElement | null>} className="relative h-[clamp(220px,40vh,340px)] w-[clamp(220px,40vh,340px)]">
+                {!desktop && step === 0 && !reaction && (
+                  <Emoji key={line.pose} name={line.pose} size={260} alt="Poupin" className="mascot pose-in absolute inset-0 !h-full !w-full drop-shadow-[0_18px_24px_rgb(76_29_149/0.3)]" />
+                )}
+              </div>
+            </div>
+
+            {!desktop && step === 0 && !reaction && (
+              <div role="status" aria-live="polite" className="bubble-in relative z-10 -mt-2 w-full max-w-sm rounded-2xl border border-line bg-surface p-4 text-[16px] font-medium leading-snug shadow-pop">
+                {line.text}
+                {line.actions && <div className="mt-3 flex flex-wrap items-center gap-2">{line.actions}</div>}
+              </div>
+            )}
+
+            <div className="relative z-10 pb-20 pt-8 text-center">
+              <h1 className="text-balance text-[clamp(2rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.035em]">
                 O mês do seu dinheiro, <span className="text-accent">numa tela só.</span>
               </h1>
-              <p className="mt-5 max-w-md text-lg text-muted">
+              <p className="mx-auto mt-3 max-w-lg text-lg text-muted">
                 Renda, contas e cartões juntos. Você sabe quanto vai sobrar no fim do mês logo no dia 1.
               </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <button type="button" onClick={goDown} className={linkButton('primary', 'lg')}>
                   Me mostra como funciona <ArrowDown size={18} />
                 </button>
@@ -666,12 +725,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                   {authenticated ? 'Abrir o app' : 'Criar conta'}
                 </Link>
               </div>
-              <p className="mt-4 text-caption text-muted">{offer}</p>
-            </div>
-            <div ref={targets.hero as RefObject<HTMLDivElement | null>} className="relative">
-              <div className="overflow-hidden rounded-panel border border-line bg-surface shadow-pop ring-8 ring-surface/60 lg:[transform:perspective(1600px)_rotateY(-9deg)_rotateX(3deg)]">
-                <img src="/tela.webp" alt={`Tela de visão geral do ${SITE.name}`} width={1440} height={900} className="w-full" />
-              </div>
+              <p className="mt-3 text-caption text-muted">{offer}</p>
             </div>
           </div>
           <button

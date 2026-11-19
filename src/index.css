@@ -421,6 +421,25 @@ main:focus {
   animation: nudge 1.4s ease-in-out infinite;
 }
 
+/* a luz do palco atrás do Poupin, e os pedaços do app flutuando em volta */
+.spotlight {
+  background: radial-gradient(closest-side, rgb(124 58 237 / 0.28), rgb(124 58 237 / 0.1) 55%, transparent 75%);
+}
+:root[data-theme='dark'] .spotlight {
+  background: radial-gradient(closest-side, rgb(139 92 246 / 0.38), rgb(124 58 237 / 0.12) 55%, transparent 75%);
+}
+@keyframes drift {
+  50% {
+    translate: 0 -8px;
+  }
+}
+.float-a {
+  animation: drift 6s ease-in-out infinite;
+}
+.float-b {
+  animation: drift 7s ease-in-out -3s infinite;
+}
+
 /* o Poupin anda de um card a outro, gingando enquanto anda */
 .walker {
   transition: transform 1.1s cubic-bezier(0.45, 0.05, 0.3, 1);
