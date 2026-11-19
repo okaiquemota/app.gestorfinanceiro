@@ -1,58 +1,34 @@
-// Site público (sem login). A página conta um mês inteiro conforme você rola:
-// do dia 1 ao 30, o dinheiro entra, as contas saem e o Poupin reage.
-// O visual é o do app (painéis, botões, valores), com um pouco mais de palco.
+// Site público (sem login). Uma tela só: um mês de exemplo que dá pra mexer,
+// e o Poupin andando por ela, explicando cada parte e reagindo ao que você faz.
 
-import { useEffect, useId, useRef, useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
-import { ArrowDown, ArrowRight, ChevronDown } from 'lucide-react'
-import { brl, splitBRL } from '../lib/format.ts'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
+import { ArrowRight, Check, Plus } from 'lucide-react'
+import { brl, brlRound, splitBRL } from '../lib/format.ts'
 import { SITE, orTBD, ownerLine } from '../lib/site.ts'
 import { Link } from '../router.tsx'
 import { Emoji, Panel, cx } from '../ui.tsx'
 
 export type PublicPlan = { price_cents: number; annual_price_cents: number; trial_days: number; billing_enabled: boolean; email_enabled: boolean }
 
-const delay = (ms: number) => ({ '--d': `${ms}ms` }) as CSSProperties
-
 /** Link com cara de botão do app (mesmas cores e cantos do <Button>). */
 export const linkButton = (variant: 'primary' | 'secondary' | 'ghost' = 'primary', size: 'md' | 'lg' = 'md') =>
   cx(
     'inline-flex shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl font-semibold transition-colors',
-    size === 'md' ? 'h-10 px-4 text-sm' : 'h-13 px-6 text-lead',
-    variant === 'primary' && 'bg-primary text-on-primary shadow-[0_8px_24px_rgb(124_58_237/0.3)] hover:bg-primary-hover',
+    size === 'md' ? 'h-10 px-4 text-sm' : 'h-12 px-5 text-lead',
+    variant === 'primary' && 'bg-primary text-on-primary hover:bg-primary-hover',
     variant === 'secondary' && 'border border-line-strong bg-surface text-fg hover:bg-sunken',
     variant === 'ghost' && 'text-muted hover:bg-sunken hover:text-fg',
   )
-
-/** Liga a classe .in nos blocos .reveal quando eles entram na tela. */
-function useReveal() {
-  const root = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const els = root.current?.querySelectorAll('.reveal') ?? []
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries)
-          if (e.isIntersecting) {
-            e.target.classList.add('in')
-            io.unobserve(e.target)
-          }
-      },
-      { rootMargin: '0px 0px -6% 0px', threshold: 0.1 },
-    )
-    els.forEach((el) => io.observe(el))
-    return () => io.disconnect()
-  }, [])
-  return root
-}
 
 /** Moldura das telas públicas: o mesmo fundo e o mesmo tema do app. */
 export function PublicShell({ children }: { children: ReactNode }) {
   return <div className="relative min-h-(--app-vh) bg-bg text-fg">{children}</div>
 }
 
-function Header({ authenticated, floating, narrow }: { authenticated?: boolean; floating?: boolean; narrow?: boolean }) {
+function Header({ authenticated, narrow }: { authenticated?: boolean; narrow?: boolean }) {
   return (
-    <header className={cx('z-30 w-full', floating ? 'fixed top-0 border-b border-line bg-bg/80 backdrop-blur-md' : 'relative')}>
+    <header className="relative z-30 w-full">
       <div className={cx('mx-auto flex h-16 items-center justify-between gap-3 px-4 sm:px-5', narrow ? 'max-w-3xl' : 'max-w-6xl')}>
         <Link href="/" className="flex items-center gap-2 rounded-xl py-1 pr-2" aria-label={`${SITE.name}: página inicial`}>
           <Emoji name="mascote" size={34} />
@@ -81,74 +57,67 @@ function Header({ authenticated, floating, narrow }: { authenticated?: boolean; 
 
 function Footer() {
   return (
-    <footer className="mx-auto max-w-6xl px-5 pb-8 pt-12">
+    <footer className="mx-auto max-w-6xl px-5 pb-8 pt-10">
       <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5 text-caption text-muted">
         <span className="flex items-center gap-2 font-medium">
-          <Emoji name="mascote" size={24} />© {new Date().getFullYear()} {SITE.name}
+          <Emoji name="mascote" size={22} />© {new Date().getFullYear()} {SITE.name}
         </span>
-        <nav aria-label="Rodapé" className="flex flex-wrap gap-x-5 gap-y-1 font-medium">
-          <Link href="/termos" className="py-1 hover:text-fg">
-            Termos de uso
-          </Link>
-          <Link href="/privacidade" className="py-1 hover:text-fg">
-            Privacidade
-          </Link>
-          {SITE.supportEmail && (
-            <a href={`mailto:${SITE.supportEmail}`} className="py-1 hover:text-fg">
-              Contato
-            </a>
-          )}
-        </nav>
+        <FooterLinks />
       </div>
     </footer>
   )
 }
 
-/** Rótulo pequeno em cima das seções. */
-const KICKER = 'text-caption font-semibold uppercase tracking-[0.1em] text-accent'
-
-/** Valor grande no padrão do app: "R$" apagado, inteiro forte, centavos menores. */
-function BigMoney({ cents, className }: { cents: number; className?: string }) {
-  const { neg, int, dec } = splitBRL(cents)
+function FooterLinks({ children, compact }: { children?: ReactNode; compact?: boolean }) {
   return (
-    <span className={cx('tnum inline-flex items-baseline whitespace-nowrap font-semibold', className)}>
-      <span className="mr-[0.15em] text-ghost">
-        {neg ? '−' : ''}R$
-      </span>
-      {int}
-      <span className="text-[0.4em] font-medium text-faint">,{dec}</span>
-    </span>
+    <nav aria-label="Rodapé" className="flex flex-wrap items-center gap-x-5 gap-y-1 text-caption font-medium text-muted">
+      {children}
+      <Link href="/termos" className="py-1 hover:text-fg">
+        Termos de uso
+      </Link>
+      <Link href="/privacidade" className="py-1 hover:text-fg">
+        Privacidade
+      </Link>
+      {SITE.supportEmail && !compact && (
+        <a href={`mailto:${SITE.supportEmail}`} className="py-1 hover:text-fg">
+          Contato
+        </a>
+      )}
+    </nav>
   )
 }
 
-// ---------- o mês ----------
+// ---------- o mês de exemplo ----------
 
-type Beat = { day: number; label: string; amount: number; say: string; pose: string }
+type Item = { id: string; name: string; cents: number; emoji: string; day?: number; note?: string; on: boolean }
 
-/** Um mês de exemplo. O saldo começa em R$ 320 e os lançamentos somam até o dia 30. */
-const START = 32000
-const MONTH: Beat[] = [
-  { day: 1, label: 'Começa o mês', amount: 0, say: 'Dia 1. Tem R$ 320 na conta e um mês inteiro pela frente.', pose: 'mascote' },
-  { day: 5, label: 'Salário', amount: 450000, say: 'Caiu o salário! Rico por algumas horas.', pose: 'mascote-festa' },
-  { day: 6, label: 'Aluguel', amount: -180000, say: 'O aluguel já deu a primeira mordida.', pose: 'mascote' },
-  { day: 10, label: 'Luz e internet', amount: -30980, say: 'Luz e internet. Até aqui, normal.', pose: 'mascote' },
-  { day: 12, label: 'Fatura do cartão', amount: -84230, say: 'A fatura. Sempre maior do que você lembrava.', pose: 'mascote-preocupado' },
-  { day: 15, label: 'Mercado', amount: -43600, say: 'Mercado do mês. Metade do caminho.', pose: 'mascote' },
-  { day: 18, label: 'Parcela do notebook', amount: -35000, say: 'Aquela parcela que você tinha esquecido.', pose: 'mascote-preocupado' },
-  { day: 20, label: 'Academia', amount: -9990, say: 'Academia. Essa pelo menos faz bem.', pose: 'mascote' },
-  { day: 23, label: 'Farmácia', amount: -28000, say: 'Imprevisto. Sempre tem um.', pose: 'mascote-preocupado' },
-  { day: 27, label: 'Gasolina', amount: -22000, say: 'Reta final. Será que dá?', pose: 'mascote-preocupado' },
-  { day: 30, label: 'Fim do mês', amount: 0, say: 'Deu. Sobraram R$ 482. Ufa.', pose: 'mascote-moeda' },
+const BILLS: Item[] = [
+  { id: 'aluguel', name: 'Aluguel', cents: 180000, emoji: 'house', day: 5, on: true },
+  { id: 'luz', name: 'Luz', cents: 18990, emoji: 'bulb', day: 10, on: true },
+  { id: 'internet', name: 'Internet', cents: 11990, emoji: 'phone', day: 10, on: true },
+  { id: 'mercado', name: 'Mercado', cents: 43600, emoji: 'cart', day: 15, on: true },
+  { id: 'academia', name: 'Academia', cents: 9990, emoji: 'target', day: 20, on: true },
+  { id: 'gasolina', name: 'Gasolina', cents: 22000, emoji: 'car', day: 27, on: true },
+  { id: 'farmacia', name: 'Farmácia', cents: 28000, emoji: 'pill', day: 23, on: false },
 ]
-const LEFTOVER = START + MONTH.reduce((s, b) => s + b.amount, 0)
-const DAYS = 30
-const WEEKDAYS = ['S', 'T', 'Q', 'Q', 'S', 'S', 'D']
-/** O dia 1 cai numa terça neste mês de exemplo. */
-const OFFSET = 1
 
-const short = (cents: number): string => {
-  const v = Math.abs(cents) / 100
-  return `${cents > 0 ? '+' : '−'}${v >= 1000 ? `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}k` : Math.round(v)}`
+const PURCHASES: Item[] = [
+  { id: 'notebook', name: 'Notebook', note: 'parcela 3 de 10', cents: 35000, emoji: 'receipt', on: true },
+  { id: 'streaming', name: 'Streaming', note: 'assinatura', cents: 5590, emoji: 'tv', on: true },
+  { id: 'delivery', name: 'Delivery', note: 'no mês', cents: 32000, emoji: 'food', on: true },
+  { id: 'viagem', name: 'Passagem', note: 'parcela 1 de 6', cents: 60000, emoji: 'plane', on: false },
+]
+
+type Mood = { pose: string; tone: 'bad' | 'warn' | 'ok' | 'good' }
+
+const moodOf = (income: number, left: number): Mood => {
+  if (income <= 0) return { pose: 'mascote-dormindo', tone: 'warn' }
+  const r = left / income
+  if (left < 0) return { pose: 'mascote-preocupado', tone: 'bad' }
+  if (r < 0.08) return { pose: 'mascote-preocupado', tone: 'warn' }
+  if (r < 0.2) return { pose: 'mascote', tone: 'ok' }
+  if (r < 0.35) return { pose: 'mascote-festa', tone: 'good' }
+  return { pose: 'mascote-moeda', tone: 'good' }
 }
 
 /** Número que "corre" até o valor novo. */
@@ -165,7 +134,7 @@ function useCount(target: number): number {
     const t0 = performance.now()
     let raf = 0
     const tick = (now: number) => {
-      const p = Math.min(1, (now - t0) / 380)
+      const p = Math.min(1, (now - t0) / 420)
       const v = Math.round(start + (target - start) * (1 - (1 - p) ** 3))
       from.current = v
       setShown(v)
@@ -177,352 +146,570 @@ function useCount(target: number): number {
   return shown
 }
 
-/** A cena fica presa na tela enquanto a rolagem avança os dias. */
-function MonthStory() {
-  const track = useRef<HTMLDivElement>(null)
-  const [day, setDay] = useState(1)
-
+function useDesktop() {
+  const q = '(min-width: 1024px)'
+  const [on, setOn] = useState(() => window.matchMedia(q).matches)
   useEffect(() => {
-    let raf = 0
-    const update = () => {
-      raf = 0
-      const el = track.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      const span = rect.height - window.innerHeight
-      const p = span > 0 ? Math.min(1, Math.max(0, -rect.top / span)) : 0
-      setDay(Math.min(DAYS, 1 + Math.floor(p * DAYS)))
-    }
-    const onScroll = () => {
-      if (!raf) raf = requestAnimationFrame(update)
-    }
-    update()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    window.addEventListener('resize', onScroll)
-    return () => {
-      window.removeEventListener('scroll', onScroll)
-      window.removeEventListener('resize', onScroll)
-      cancelAnimationFrame(raf)
-    }
+    const m = window.matchMedia(q)
+    const f = () => setOn(m.matches)
+    m.addEventListener('change', f)
+    return () => m.removeEventListener('change', f)
   }, [])
-
-  const past = MONTH.filter((b) => b.day <= day)
-  const beat = past[past.length - 1]
-  const balance = START + past.reduce((s, b) => s + b.amount, 0)
-  const shown = useCount(balance)
-  const tense = balance < 80000 && day > 5 && day < DAYS
-  const byDay = new Map(MONTH.filter((b) => b.amount !== 0).map((b) => [b.day, b]))
-
-  return (
-    <section ref={track} aria-label="Um mês de exemplo, dia a dia" className="relative" style={{ height: `${DAYS * 26}vh` }}>
-      <div className="sticky top-0 flex h-(--app-vh) flex-col overflow-hidden border-y border-line pt-16">
-        {/* brilho de fundo: violeta no caminho, vermelho quando aperta, verde no fim */}
-        <div
-          aria-hidden
-          className={cx(
-            'pointer-events-none absolute left-1/2 top-1/2 h-[75%] w-[85%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[100px] transition-colors duration-700',
-            tense ? 'bg-[rgb(239_68_68/0.2)]' : day === DAYS ? 'bg-[rgb(22_163_74/0.2)]' : 'bg-[rgb(124_58_237/0.18)]',
-          )}
-        />
-        <div aria-hidden className="hero-grid pointer-events-none absolute inset-0" />
-
-        {/* avanço do mês */}
-        <div aria-hidden className="absolute inset-x-0 top-16 h-1 bg-line">
-          <div
-            className="h-full bg-[linear-gradient(90deg,#7c3aed,#c026d3)] transition-[width] duration-200"
-            style={{ width: `${((day - 1) / (DAYS - 1)) * 100}%` }}
-          />
-        </div>
-
-        <div className="relative mx-auto grid min-h-0 w-full max-w-6xl flex-1 items-center gap-x-10 gap-y-3 px-4 pb-4 sm:px-5 lg:grid-cols-[1.05fr_0.95fr]">
-          {/* calendário */}
-          <Panel className="mx-auto w-full max-w-[560px] p-2.5 shadow-pop sm:p-4 lg:order-2">
-            <div aria-hidden className="grid grid-cols-7 gap-1 text-center text-micro font-semibold text-faint sm:gap-1.5">
-              {WEEKDAYS.map((w, i) => (
-                <span key={i}>{w}</span>
-              ))}
-            </div>
-            <ol className="mt-1.5 grid grid-cols-7 gap-1 sm:gap-1.5" aria-hidden>
-              {Array.from({ length: OFFSET }, (_, i) => (
-                <li key={`v${i}`} />
-              ))}
-              {Array.from({ length: DAYS }, (_, i) => {
-                const d = i + 1
-                const ev = byDay.get(d)
-                const done = d < day
-                const today = d === day
-                return (
-                  <li
-                    key={d}
-                    className={cx(
-                      'relative flex aspect-square flex-col rounded-lg p-1 transition-colors max-sm:aspect-[1/0.82] sm:rounded-xl sm:p-1.5',
-                      today
-                        ? 'bg-primary text-on-primary shadow-[0_6px_16px_rgb(124_58_237/0.4)]'
-                        : done
-                          ? 'bg-sunken text-faint'
-                          : 'border border-line bg-surface',
-                    )}
-                  >
-                    <span className={cx('tnum text-micro font-semibold leading-none sm:text-caption', done && 'line-through')}>{d}</span>
-                    {ev && d <= day && (
-                      <span
-                        className={cx(
-                          'stamp tnum mt-auto rounded-full px-0.5 text-center text-[9px] font-semibold leading-tight sm:py-0.5 sm:text-micro',
-                          ev.amount > 0 ? 'bg-good-soft text-good' : 'bg-bad-soft text-bad',
-                          today && 'bg-white/90',
-                        )}
-                      >
-                        {short(ev.amount)}
-                      </span>
-                    )}
-                  </li>
-                )
-              })}
-            </ol>
-          </Panel>
-
-          {/* o que está acontecendo */}
-          <div className="lg:order-1" aria-live="polite">
-            <p className={KICKER}>
-              Dia <span className="tnum">{String(day).padStart(2, '0')}</span>
-              <span className="text-faint"> · {beat.label}</span>
-            </p>
-            <p className="mt-1 text-caption font-medium text-muted lg:mt-3">Na conta</p>
-            <BigMoney
-              cents={shown}
-              className={cx('text-[clamp(2.5rem,10vw,5.5rem)] leading-[0.95] tracking-[-0.045em]', tense && 'text-bad')}
-            />
-            <div className="mt-3 flex items-end gap-3 lg:mt-7">
-              <Emoji
-                key={beat.pose}
-                name={beat.pose}
-                size={120}
-                className="pop-in !h-auto !w-[clamp(64px,13vw,120px)] shrink-0 drop-shadow-[0_14px_18px_rgb(0_0_0/0.18)]"
-              />
-              <p
-                key={beat.day}
-                className="pop-in relative mb-3 rounded-2xl rounded-bl-md border border-line bg-surface px-4 py-3 text-[15px] font-medium leading-snug shadow-pop sm:text-lg"
-              >
-                {beat.say}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  )
+  return on
 }
 
-const INSIDE: [string, string, string][] = [
-  ['Saldo previsto', 'Renda menos contas, cartões e dia a dia. O número que importa, já calculado.', 'money-bag'],
-  ['Contas por vencimento', 'O que vence em cada dia, o que foi pago e o que atrasou.', 'calendar'],
-  ['Cartões e parcelas', 'Cada compra na fatura certa, e as próximas faturas antes de chegarem.', 'card'],
-  ['Os próximos 12 meses', 'Onde vai apertar, com tempo de se preparar.', 'chart-up'],
-  ['Reserva com metas', 'Quanto guardar por mês pra chegar no valor que você quer.', 'target'],
-]
+// ---------- o Poupin ----------
 
-const FAQ: [string, string][] = [
-  ['O Poupin se conecta ao meu banco?', 'Não. Você mesmo cadastra renda, contas e cartões. O Poupin nunca pede senha de banco nem acesso à sua conta bancária.'],
-  [
-    'Meus dados ficam seguros?',
-    'Seus dados ficam na sua conta, protegida por senha, e a conexão é sempre criptografada. Você pode baixar uma cópia de tudo ou excluir a conta quando quiser, direto nos Ajustes.',
-  ],
-  ['Preciso de cartão de crédito pra testar?', 'Não. O teste começa quando você cria a conta, sem informar nenhum meio de pagamento.'],
-  [
-    'E se eu não quiser continuar?',
-    'Você não é cobrado. Ao fim do teste a conta fica só para consulta: dá pra ver e exportar tudo, mas não lançar coisas novas, até você assinar ou excluir a conta.',
-  ],
-  ['Funciona no celular?', 'Funciona. Abre no navegador do celular e do computador, sem instalar nada, com os mesmos dados nos dois.'],
-]
+type Spot = 'hero' | 'salary' | 'bills' | 'card' | 'left' | 'cta' | 'faq'
 
-function Question({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false)
-  const id = useId()
+type Line = {
+  spot: Spot
+  pose: string
+  text: ReactNode
+  /** Botões dentro do balão. */
+  actions?: ReactNode
+}
+
+const MASCOT = 132
+
+/**
+ * Onde o Poupin para em cada parte, e pra que lado abre o balão: sempre pro
+ * lado de fora do card que ele está explicando, pra não cobrir o que importa.
+ */
+const SPOTS: Record<Spot, { corner: 'tr' | 'tl' | 'beside' | 'above'; side: 'left' | 'right'; up?: boolean }> = {
+  hero: { corner: 'beside', side: 'right' },
+  left: { corner: 'tr', side: 'right' },
+  salary: { corner: 'tr', side: 'right' },
+  card: { corner: 'tr', side: 'right' },
+  bills: { corner: 'tl', side: 'left' },
+  cta: { corner: 'above', side: 'right', up: true },
+  faq: { corner: 'above', side: 'left', up: true },
+}
+
+function anchor(spot: Spot, r: DOMRect, stage: DOMRect): { x: number; y: number } {
+  const x = r.left - stage.left
+  const y = r.top - stage.top
+  const c = SPOTS[spot].corner
+  if (c === 'beside') return { x: x + r.width + 16, y: y + r.height - MASCOT + 10 }
+  if (c === 'above') return { x: x + r.width - MASCOT * 0.9, y: y - MASCOT + 26 }
+  if (c === 'tl') return { x: x - MASCOT * 0.8, y: y - MASCOT * 0.74 }
+  return { x: x + r.width - MASCOT * 0.72, y: y - MASCOT * 0.56 }
+}
+
+function Walker({
+  stage,
+  targets,
+  line,
+  desktop,
+}: {
+  stage: RefObject<HTMLDivElement | null>
+  targets: Record<Spot, RefObject<HTMLElement | null>>
+  line: Line
+  desktop: boolean
+}) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const [walking, setWalking] = useState(false)
+  const [facingLeft, setFacingLeft] = useState(false)
+  const last = useRef<{ x: number; y: number } | null>(null)
+  const entered = useRef(false)
+
+  const place = useCallback(() => {
+    const s = stage.current?.getBoundingClientRect()
+    const t = targets[line.spot].current?.getBoundingClientRect()
+    if (!s || !t) return
+    const p = anchor(line.spot, t, s)
+    p.x = Math.max(0, Math.min(s.width - MASCOT, p.x))
+    p.y = Math.max(0, p.y)
+    // na primeira vez ele entra andando pela esquerda
+    if (!last.current && !entered.current) {
+      entered.current = true
+      last.current = { x: 0, y: p.y }
+      setPos(last.current)
+      requestAnimationFrame(() => requestAnimationFrame(() => place()))
+      return
+    }
+    const prev = last.current
+    if (prev && (Math.abs(prev.x - p.x) > 4 || Math.abs(prev.y - p.y) > 4)) {
+      setFacingLeft(p.x < prev.x)
+      setWalking(true)
+    }
+    last.current = p
+    setPos(p)
+  }, [stage, targets, line.spot])
+
+  useLayoutEffect(() => {
+    if (desktop) place()
+  }, [desktop, place])
+
+  useEffect(() => {
+    if (!desktop) return
+    const onResize = () => {
+      last.current = null
+      place()
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [desktop, place])
+
+  // no celular ele fica no canto e a tela rola até a parte que ele está explicando
+  useEffect(() => {
+    if (desktop) return
+    targets[line.spot].current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [desktop, line.spot, targets])
+
+  const bubble = (
+    <div
+      key={String(line.spot) + String(typeof line.text === 'string' ? line.text : '')}
+      role="status"
+      aria-live="polite"
+      className="bubble-in rounded-2xl border border-line bg-surface p-4 text-[15px] leading-snug shadow-pop"
+    >
+      <div className="font-medium">{line.text}</div>
+      {line.actions && <div className="mt-3 flex flex-wrap items-center gap-2">{line.actions}</div>}
+    </div>
+  )
+
+  const body = (
+    <div className={cx('relative', facingLeft && '-scale-x-100')}>
+      <span aria-hidden className="absolute inset-x-5 bottom-1 h-3 rounded-full bg-black/15 blur-[6px]" />
+      <div className={cx(walking && 'waddle')}>
+        <Emoji key={line.pose} name={line.pose} size={MASCOT} alt="Poupin" className="pose-in relative drop-shadow-[0_10px_14px_rgb(0_0_0/0.18)]" />
+      </div>
+    </div>
+  )
+
+  if (!desktop)
+    return (
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex items-end gap-1 px-3 pb-3">
+        <div className="pointer-events-auto min-w-0 flex-1 pb-2">{bubble}</div>
+        <div className="w-[92px] shrink-0 [&_img]:!h-auto [&_img]:!w-[92px]">{body}</div>
+      </div>
+    )
+
+  if (!pos) return null
+  const cfg = SPOTS[line.spot]
+  const bubbleOnLeft = cfg.side === 'left' ? pos.x > 300 : pos.x > (stage.current?.clientWidth ?? 0) - MASCOT - 300
   return (
-    <div>
-      <h3>
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={id}
-          onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-lg font-semibold hover:bg-sunken sm:px-6"
-        >
-          {q}
-          <ChevronDown aria-hidden size={20} className={cx('shrink-0 text-muted transition-transform', open && 'rotate-180')} />
-        </button>
-      </h3>
-      <p id={id} hidden={!open} className="max-w-2xl px-5 pb-5 text-muted sm:px-6">
-        {a}
-      </p>
+    <div
+      className="walker pointer-events-none absolute left-0 top-0 z-40"
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, width: MASCOT, height: MASCOT }}
+      onTransitionEnd={() => setWalking(false)}
+    >
+      {body}
+      <div
+        className={cx('pointer-events-auto absolute w-[300px]', cfg.up ? 'bottom-6' : 'top-2', bubbleOnLeft ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]')}
+      >
+        {bubble}
+      </div>
     </div>
   )
 }
 
+// ---------- peças da tela ----------
+
+function Toggle({ item, onToggle }: { item: Item; onToggle: () => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={item.on}
+        className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-sunken"
+      >
+        <span
+          className={cx(
+            'flex size-[22px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-colors',
+            item.on ? 'border-primary bg-primary text-on-primary' : 'border-control text-transparent group-hover:text-faint',
+          )}
+        >
+          {item.on ? <Check size={13} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
+        </span>
+        <Emoji name={item.emoji} size={26} className={cx('transition-opacity', !item.on && 'opacity-40 grayscale')} />
+        <span className={cx('min-w-0 flex-1', !item.on && 'text-faint')}>
+          <span className="block truncate font-medium">{item.name}</span>
+          {(item.note || item.day) && (
+            <span className="block text-micro text-faint">{item.note ?? `vence dia ${String(item.day).padStart(2, '0')}`}</span>
+          )}
+        </span>
+        <span className={cx('tnum font-semibold', !item.on && 'text-faint line-through')}>{brl(item.cents)}</span>
+      </button>
+    </li>
+  )
+}
+
+function bigMoney(cents: number) {
+  const { neg, int, dec } = splitBRL(cents)
+  return (
+    <>
+      <span className="mr-[0.15em] text-ghost">{neg ? '−' : ''}R$</span>
+      {int}
+      <span className="text-[0.38em] font-medium text-faint">,{dec}</span>
+    </>
+  )
+}
+
+const FAQ: [string, string][] = [
+  ['Ele se conecta ao meu banco?', 'Não. Você mesmo cadastra renda, contas e cartões. Eu nunca peço senha de banco nem acesso à sua conta.'],
+  ['Meus dados ficam seguros?', 'Ficam na sua conta, protegida por senha, com conexão criptografada. Dá pra baixar uma cópia ou excluir tudo quando quiser, nos Ajustes.'],
+  ['Preciso de cartão pra testar?', 'Não. O teste começa quando você cria a conta, sem nenhum meio de pagamento.'],
+  ['E se eu não quiser continuar?', 'Você não é cobrado. A conta fica só pra consulta: dá pra ver e exportar tudo, mas não lançar coisa nova.'],
+  ['Funciona no celular?', 'Funciona. Abre no navegador do celular e do computador, com os mesmos dados nos dois.'],
+]
+
 export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticated?: boolean }) {
-  const root = useReveal()
+  const desktop = useDesktop()
   const start = authenticated ? '/' : '/criar-conta'
-  const startLabel = authenticated ? 'Abrir o app' : `Testar grátis por ${plan.trial_days} dias`
+  const offer = plan.billing_enabled
+    ? `${plan.trial_days} dias grátis, sem cartão. Depois, ${brl(plan.price_cents)} por mês.`
+    : 'De graça no lançamento, com tudo liberado.'
+
+  const [salary, setSalary] = useState(450000)
+  const [bills, setBills] = useState(BILLS)
+  const [buys, setBuys] = useState(PURCHASES)
+  const billsTotal = bills.reduce((s, b) => s + (b.on ? b.cents : 0), 0)
+  const cardTotal = buys.reduce((s, b) => s + (b.on ? b.cents : 0), 0)
+  const left = salary - billsTotal - cardTotal
+  const shownLeft = useCount(left)
+  const mood = moodOf(salary, left)
+
+  const stage = useRef<HTMLDivElement>(null)
+  const targets = {
+    hero: useRef<HTMLElement>(null),
+    salary: useRef<HTMLElement>(null),
+    bills: useRef<HTMLElement>(null),
+    card: useRef<HTMLElement>(null),
+    left: useRef<HTMLElement>(null),
+    cta: useRef<HTMLElement>(null),
+    faq: useRef<HTMLElement>(null),
+  }
+
+  // ---- o roteiro do passeio ----
+  const [step, setStep] = useState(0)
+  const [reaction, setReaction] = useState<Line | null>(null)
+  const touring = step < 6
+  const next = () => {
+    setReaction(null)
+    setStep((s) => s + 1)
+  }
+  const skip = () => {
+    setReaction(null)
+    setStep(6)
+  }
+
+  const nextBtn = (label = 'Continuar') => (
+    <>
+      <button type="button" onClick={next} className={cx(linkButton('primary'), 'h-9 px-3.5')}>
+        {label} <ArrowRight size={16} />
+      </button>
+      {step > 0 && step < 5 && (
+        <button type="button" onClick={skip} className="h-9 px-2 text-caption font-medium text-muted hover:text-fg">
+          Pular
+        </button>
+      )}
+    </>
+  )
+
+  const leftText = left < 0 ? `falta ${brl(-left)}` : `sobram ${brl(left)}`
+  const script: Line[] = [
+    {
+      spot: 'hero',
+      pose: 'mascote-oi',
+      text: `Oi! Eu sou o ${SITE.name}. Deixa eu te mostrar como fica um mês aqui dentro? Leva meio minuto.`,
+      actions: nextBtn('Bora'),
+    },
+    {
+      spot: 'salary',
+      pose: 'mascote-moeda',
+      text: 'Tudo começa pelo que entra. Arrasta aí e coloca um salário parecido com o seu.',
+      actions: nextBtn(),
+    },
+    {
+      spot: 'bills',
+      pose: 'mascote',
+      text: 'Essas são as contas do mês, na ordem em que vencem. Toca numa pra tirar ou pôr de volta.',
+      actions: nextBtn(),
+    },
+    {
+      spot: 'card',
+      pose: 'mascote-preocupado',
+      text: 'O cartão eu separo compra por compra, parcela por parcela. A fatura não pega ninguém de surpresa.',
+      actions: nextBtn(),
+    },
+    {
+      spot: 'left',
+      pose: mood.pose,
+      text: (
+        <>
+          E esse é o número que importa: com esse mês, <strong>{leftText}</strong>. Você vê isso no dia 1, não no dia 30.
+        </>
+      ),
+      actions: nextBtn(),
+    },
+    {
+      spot: 'cta',
+      pose: 'mascote-festa',
+      text: `Gostou? Bora montar o seu mês de verdade. ${offer}`,
+      actions: (
+        <>
+          <Link href={start} className={cx(linkButton('primary'), 'h-9 px-3.5')}>
+            {authenticated ? 'Abrir o app' : 'Criar minha conta'} <ArrowRight size={16} />
+          </Link>
+          <button type="button" onClick={skip} className="h-9 px-2 text-caption font-medium text-muted hover:text-fg">
+            Quero mexer mais
+          </button>
+        </>
+      ),
+    },
+  ]
+  const idle: Line = {
+    spot: 'left',
+    pose: mood.pose,
+    text: left < 0 ? 'No vermelho. Tira alguma coisa ou aumenta o salário pra ver o que muda.' : 'Pode mexer à vontade, eu refaço a conta na hora.',
+  }
+  const line = reaction ?? (touring ? script[step] : idle)
+
+  // ---- reações ----
+  const timer = useRef(0)
+  const react = (l: Line, keep = 4200) => {
+    window.clearTimeout(timer.current)
+    setReaction(
+      touring
+        ? {
+            ...l,
+            actions: (
+              <button type="button" onClick={() => setReaction(null)} className={cx(linkButton('secondary'), 'h-9 px-3')}>
+                Continuar o passeio <ArrowRight size={16} />
+              </button>
+            ),
+          }
+        : l,
+    )
+    timer.current = window.setTimeout(() => setReaction(null), keep)
+  }
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const toggle = (list: 'bills' | 'card', id: string) => {
+    const items = list === 'bills' ? bills : buys
+    const item = items.find((i) => i.id === id)
+    if (!item) return
+    const after = left + (item.on ? item.cents : -item.cents)
+    const m = moodOf(salary, after)
+    const set = list === 'bills' ? setBills : setBuys
+    set(items.map((i) => (i.id === id ? { ...i, on: !i.on } : i)))
+    if (item.on)
+      react({
+        spot: list,
+        pose: after >= 0 ? (m.pose === 'mascote-preocupado' ? 'mascote' : 'mascote-festa') : 'mascote-preocupado',
+        text:
+          after >= 0 && left < 0
+            ? `Ufa! Sem ${item.name.toLowerCase()} o mês volta pro azul.`
+            : `Sem ${item.name.toLowerCase()}, sobram mais ${brl(item.cents)}. Agora fica em ${brl(after)}.`,
+      })
+    else
+      react({
+        spot: list,
+        pose: after < 0 ? 'mascote-preocupado' : m.pose === 'mascote-preocupado' ? 'mascote-preocupado' : 'mascote',
+        text:
+          after < 0 && left >= 0
+            ? `Ih! Com ${item.name.toLowerCase()}, o mês fecha no vermelho: falta ${brl(-after)}.`
+            : `${item.name} entrou: lá se vão ${brl(item.cents)}. Sobra ${after < 0 ? `negativa de ${brl(-after)}` : brl(after)}.`,
+      })
+  }
+
+  const salaryTimer = useRef(0)
+  const changeSalary = (v: number) => {
+    setSalary(v)
+    window.clearTimeout(salaryTimer.current)
+    salaryTimer.current = window.setTimeout(() => {
+      const l = v - billsTotal - cardTotal
+      const m = moodOf(v, l)
+      react({
+        spot: 'salary',
+        pose: m.pose,
+        text:
+          l < 0
+            ? `Com ${brlRound(v)} entrando, faltam ${brl(-l)} no fim do mês. Melhor saber agora, né?`
+            : m.tone === 'good'
+              ? `Com ${brlRound(v)}, sobram ${brl(l)}. Dá até pra guardar um pouco!`
+              : `Com ${brlRound(v)}, sobram ${brl(l)}. Apertadinho, mas fecha.`,
+      })
+    }, 350)
+  }
+
+  const askFaq = () => {
+    window.clearTimeout(timer.current)
+    setReaction({
+      spot: 'faq',
+      pose: 'mascote-oi',
+      text: 'Pode perguntar! O que você quer saber?',
+      actions: FAQ.map(([q, a]) => (
+        <button
+          key={q}
+          type="button"
+          onClick={() => {
+            window.clearTimeout(timer.current)
+            setReaction({
+              spot: 'faq',
+              pose: 'mascote',
+              text: a,
+              actions: (
+                <>
+                  <button type="button" onClick={askFaq} className={cx(linkButton('secondary'), 'h-9 px-3')}>
+                    Outra dúvida
+                  </button>
+                  <button type="button" onClick={() => setReaction(null)} className="h-9 px-2 text-caption font-medium text-muted hover:text-fg">
+                    Fechar
+                  </button>
+                </>
+              ),
+            })
+          }}
+          className="rounded-full border border-line-strong bg-surface px-3 py-1.5 text-caption font-medium hover:border-primary hover:text-accent"
+        >
+          {q}
+        </button>
+      )),
+    })
+  }
+
+  // o card em foco fica aceso; os outros apagam um pouco durante o passeio
+  const focus = (s: Spot) =>
+    cx(
+      'transition-[opacity,box-shadow,transform] duration-500',
+      touring && !reaction && line.spot !== s && desktop && 'opacity-45',
+      line.spot === s && 'ring-2 ring-primary/70 shadow-pop',
+    )
+
+  const tone = { bad: 'text-bad', warn: 'text-warn', ok: 'text-fg', good: 'text-good' }[mood.tone]
+  const pct = salary > 0 ? Math.round((left / salary) * 100) : 0
+
   return (
     <PublicShell>
-      <div ref={root}>
-        <Header authenticated={authenticated} floating />
-        <main>
-          {/* ---------- convite ---------- */}
-          <section className="relative overflow-hidden">
-            <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
-            <div aria-hidden className="hero-grid pointer-events-none absolute inset-0" />
-            <div className="hero-in relative mx-auto flex min-h-(--app-vh) max-w-6xl flex-col justify-center px-5 pb-10 pt-24">
-              <Emoji name="mascote-oi" size={150} className="mascot !h-auto !w-[clamp(96px,18vw,150px)] drop-shadow-[0_18px_24px_rgb(124_58_237/0.3)]" />
-              <h1 className="mt-5 max-w-4xl text-[clamp(2.75rem,10vw,7rem)] font-semibold leading-[0.95] tracking-[-0.05em]">
-                Um mês na vida do seu <span className="text-gradient">dinheiro.</span>
-              </h1>
-              <p className="mt-6 max-w-xl text-lg text-muted sm:text-xl">
-                Role a página. Cada rolada é um dia: o salário cai, as contas chegam, e no fim você descobre quanto sobrou.
-              </p>
-              <p className="mt-8">
-                <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-4 py-2 text-caption font-semibold uppercase tracking-[0.1em] shadow-card backdrop-blur">
-                  <ArrowDown size={16} className="nudge text-accent" /> Começa no dia 1
-                </span>
-              </p>
-            </div>
-          </section>
+      <div aria-hidden className="stage-dots pointer-events-none absolute inset-0" />
+      <Header authenticated={authenticated} />
+      <main ref={stage} className="relative mx-auto flex max-w-6xl flex-col px-4 pb-48 sm:px-5 lg:h-[calc(var(--app-vh)-4rem)] lg:pb-5">
+        {/* apresentação */}
+        <section ref={targets.hero} className="max-w-xl pt-2 lg:pt-1">
+          <h1 className="text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.05] tracking-[-0.035em]">
+            O mês do seu dinheiro, <span className="text-accent">numa tela só.</span>
+          </h1>
+          <p className="mt-2 text-lead text-muted">Este é um mês de exemplo. Pode mexer em tudo: o {SITE.name} refaz a conta na hora.</p>
+        </section>
 
-          <MonthStory />
-
-          {/* ---------- a virada ---------- */}
-          <section className="relative overflow-hidden">
-            <div aria-hidden className="pointer-events-none absolute -right-40 top-1/3 size-[36rem] rounded-full bg-primary/15 blur-[120px]" />
-            <div className="relative mx-auto max-w-6xl px-5 py-20 sm:py-28">
-              <p className="reveal text-[clamp(2rem,6.5vw,4.5rem)] font-semibold leading-[1] tracking-[-0.045em]">
-                Sobraram {brl(LEFTOVER)}.
-                <br />
-                <span className="text-faint">Mas você só descobriu no dia 30.</span>
+        <div className="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-12 lg:gap-5">
+          <div className="flex min-h-0 flex-col gap-4 lg:col-span-7 lg:gap-5">
+            {/* a sobra */}
+            <Panel className={cx('relative flex flex-col justify-center p-5 sm:p-6 lg:flex-1', focus('left'))}>
+              <section ref={targets.left} className="absolute inset-0" aria-hidden />
+              <p className="text-lead font-semibold">Quanto sobra no fim do mês</p>
+              <p className={cx('tnum mt-2 whitespace-nowrap text-[clamp(2.75rem,7vw,5rem)] font-semibold leading-none tracking-[-0.045em]', tone)}>
+                {bigMoney(shownLeft)}
               </p>
-              <div className="mt-14 grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
-                <div className="reveal">
-                  <h2 className="text-[clamp(1.9rem,5vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.04em]">
-                    No {SITE.name}, esse número aparece no <span className="text-gradient">dia 1.</span>
-                  </h2>
-                  <p className="mt-4 max-w-md text-lg text-muted">
-                    Você cadastra o que entra e o que vence. Ele faz a conta do mês inteiro e refaz a cada coisa que você paga.
-                  </p>
-                  <Link href={start} className={cx(linkButton('primary', 'lg'), 'mt-7')}>
-                    {startLabel} <ArrowRight size={20} />
-                  </Link>
-                  {!authenticated && <p className="mt-3 text-caption text-muted">Sem cartão de crédito.</p>}
-                </div>
-                <div className="reveal relative" style={delay(100)}>
-                  <div aria-hidden className="absolute inset-6 rounded-full bg-primary/30 blur-3xl" />
-                  <div className="relative overflow-hidden rounded-panel border border-line bg-surface shadow-pop ring-8 ring-surface/60">
-                    <img
-                      src="/tela.webp"
-                      alt={`Tela de visão geral do ${SITE.name}: saldo previsto, contas a pagar, categorias de gasto e cartões`}
-                      width={1440}
-                      height={900}
-                      loading="lazy"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
+              <p className="mt-2 text-muted">
+                {salary > 0 ? (left >= 0 ? `${pct}% do que entra fica livre` : 'as saídas passam do que entra') : 'sem renda, sem conta'}
+              </p>
+              <div aria-hidden className="mt-4 flex h-2.5 gap-[2px] overflow-hidden rounded-full bg-sunken">
+                <span className="bar-seg rounded-[2px] bg-[var(--s-bills)]" style={{ flexGrow: billsTotal }} />
+                <span className="bar-seg rounded-[2px] bg-[var(--s-cards)]" style={{ flexGrow: cardTotal }} />
+                <span className="bar-seg rounded-[2px] bg-[var(--s-left)]" style={{ flexGrow: Math.max(0, left) }} />
               </div>
-            </div>
-          </section>
+              <div className="mt-2 flex flex-wrap gap-x-4 text-caption text-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-[var(--s-bills)]" /> Contas {brlRound(billsTotal)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-[var(--s-cards)]" /> Cartão {brlRound(cardTotal)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-[var(--s-left)]" /> Sobra {brlRound(Math.max(0, left))}
+                </span>
+              </div>
+            </Panel>
 
-          {/* ---------- o que tem dentro ---------- */}
-          <section aria-labelledby="dentro" className="border-y border-line bg-surface">
-            <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
-              <h2 id="dentro" className={cx('reveal', KICKER)}>
-                O que tem dentro
-              </h2>
-              <ul className="mt-4">
-                {INSIDE.map(([title, text, emoji], i) => (
-                  <li
-                    key={title}
-                    className="reveal group grid gap-x-8 gap-y-1 border-t border-line py-6 first:border-t-0 md:grid-cols-[1fr_1fr] md:items-center"
-                    style={delay(i * 50)}
-                  >
-                    <h3 className="flex items-center gap-4 text-[clamp(1.5rem,4vw,2.5rem)] font-semibold leading-tight tracking-[-0.035em]">
-                      <Emoji
-                        name={emoji}
-                        size={56}
-                        className="!h-auto !w-[clamp(40px,6vw,56px)] drop-shadow-[0_8px_10px_rgb(0_0_0/0.12)] transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110"
-                      />
-                      {title}
-                    </h3>
-                    <p className="text-lg text-muted md:pl-0 max-md:pl-[calc(clamp(40px,6vw,56px)+1rem)]">{text}</p>
-                  </li>
+            <div className="grid gap-4 sm:grid-cols-2 lg:gap-5">
+              {/* o que entra */}
+              <Panel className={cx('p-5', focus('salary'))}>
+                <section ref={targets.salary}>
+                  <p className="text-lead font-semibold">O que entra</p>
+                  <p className="tnum mt-2 text-3xl font-semibold tracking-[-0.03em]">{bigMoney(salary)}</p>
+                  <label className="mt-4 block">
+                    <span className="sr-only">Salário do mês</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1500000}
+                      step={10000}
+                      value={salary}
+                      onChange={(e) => changeSalary(Number(e.target.value))}
+                      className="range w-full"
+                      style={{ '--p': `${(salary / 1500000) * 100}%` } as CSSProperties}
+                    />
+                  </label>
+                  <div className="mt-1 flex justify-between text-micro text-faint">
+                    <span>R$ 0</span>
+                    <span>R$ 15 mil</span>
+                  </div>
+                </section>
+              </Panel>
+
+              {/* o cartão */}
+              <Panel className={cx('p-5', focus('card'))}>
+                <section ref={targets.card}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="text-lead font-semibold">Fatura do cartão</p>
+                    <p className="tnum font-semibold">{brl(cardTotal)}</p>
+                  </div>
+                  <ul className="-mx-2 mt-2">
+                    {buys.map((b) => (
+                      <Toggle key={b.id} item={b} onToggle={() => toggle('card', b.id)} />
+                    ))}
+                  </ul>
+                </section>
+              </Panel>
+            </div>
+          </div>
+
+          {/* as contas */}
+          <Panel className={cx('flex min-h-0 flex-col p-5 lg:col-span-5', focus('bills'))}>
+            <section ref={targets.bills} className="flex min-h-0 flex-1 flex-col">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-lead font-semibold">Contas do mês</p>
+                <p className="tnum font-semibold">{brl(billsTotal)}</p>
+              </div>
+              <p className="text-caption text-muted">toque pra tirar ou pôr de volta</p>
+              <ul className="no-scrollbar -mx-2 mt-2 min-h-0 flex-1 overflow-y-auto">
+                {bills.map((b) => (
+                  <Toggle key={b.id} item={b} onToggle={() => toggle('bills', b.id)} />
                 ))}
               </ul>
-            </div>
-          </section>
+            </section>
+          </Panel>
+        </div>
 
-          {/* ---------- preço ---------- */}
-          <section id="preco" aria-labelledby="preco-titulo" className="mx-auto max-w-6xl scroll-mt-20 px-5 py-16 sm:py-24">
-            <Panel className="reveal relative grid gap-6 overflow-hidden p-6 shadow-pop sm:p-10 md:grid-cols-[1.2fr_0.8fr] md:items-center">
-              <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-primary/15 blur-3xl" />
-              <div className="relative">
-                <h2 id="preco-titulo" className={KICKER}>
-                  Quanto custa
-                </h2>
-                {plan.billing_enabled ? (
-                  <p className="mt-2 flex flex-wrap items-baseline gap-x-3">
-                    <BigMoney cents={plan.price_cents} className="text-[clamp(3.25rem,11vw,6rem)] leading-none tracking-[-0.05em]" />
-                    <span className="text-xl font-medium text-muted">por mês</span>
-                  </p>
-                ) : (
-                  <p className="mt-2 text-[clamp(2.5rem,8vw,4.5rem)] font-semibold leading-none tracking-[-0.045em]">
-                    <span className="text-gradient">Grátis</span> no lançamento.
-                  </p>
-                )}
-                <p className="mt-4 max-w-lg text-lg text-muted">
-                  {plan.billing_enabled
-                    ? `Ou ${brl(plan.annual_price_cents)} no plano anual, em até 12× no cartão. Os primeiros ${plan.trial_days} dias são grátis, e você paga com cartão ou boleto.`
-                    : `A assinatura ainda não foi aberta. Enquanto isso, o uso é gratuito e tem tudo liberado.`}
-                </p>
-              </div>
-              <div className="relative md:text-right">
-                <Link href={start} className={linkButton('primary', 'lg')}>
-                  {authenticated ? 'Abrir o app' : 'Começar agora'} <ArrowRight size={20} />
-                </Link>
-              </div>
-            </Panel>
+        {/* chamada e rodapé */}
+        <div className="mt-4 flex flex-col gap-3 lg:mt-5 lg:flex-row lg:items-center lg:justify-between">
+          <section ref={targets.cta} className={cx('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl p-1 lg:flex-nowrap', focus('cta'))}>
+            <Link href={start} className={linkButton('primary', 'lg')}>
+              {authenticated ? 'Abrir o app' : 'Montar o meu mês de verdade'} <ArrowRight size={18} />
+            </Link>
+            <span className="text-caption text-muted">{offer}</span>
           </section>
+          <section ref={targets.faq} className="rounded-panel">
+            <FooterLinks compact>
+              <button type="button" onClick={askFaq} className="py-1 font-semibold text-accent hover:underline">
+                Perguntar ao {SITE.name}
+              </button>
+              {!touring && (
+                <button type="button" onClick={() => setStep(0)} className="py-1 hover:text-fg">
+                  Rever o passeio
+                </button>
+              )}
+            </FooterLinks>
+          </section>
+        </div>
 
-          {/* ---------- dúvidas ---------- */}
-          <section aria-labelledby="duvidas-titulo" className="mx-auto max-w-6xl px-5 pb-8">
-            <h2 id="duvidas-titulo" className={cx('reveal', KICKER)}>
-              Dúvidas
-            </h2>
-            <Panel className="reveal mt-4 divide-y divide-line overflow-hidden">
-              {FAQ.map(([q, a]) => (
-                <Question key={q} q={q} a={a} />
-              ))}
-            </Panel>
-          </section>
-
-          {/* ---------- fecho ---------- */}
-          <section className="relative overflow-hidden">
-            <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
-            <div className="relative mx-auto max-w-6xl px-5 py-16 text-center sm:py-24">
-              <Emoji
-                name="mascote-moeda"
-                size={160}
-                className="mascot reveal mx-auto !h-auto !w-[clamp(110px,22vw,160px)] drop-shadow-[0_18px_24px_rgb(124_58_237/0.3)]"
-              />
-              <h2 className="reveal mx-auto mt-5 max-w-4xl text-[clamp(2.5rem,9vw,6rem)] font-semibold leading-[0.95] tracking-[-0.05em]">
-                E o seu mês, <span className="text-gradient">como termina?</span>
-              </h2>
-              <div className="reveal mt-8" style={delay(80)}>
-                <Link href={start} className={linkButton('primary', 'lg')}>
-                  {startLabel} <ArrowRight size={20} />
-                </Link>
-              </div>
-            </div>
-          </section>
-        </main>
-        <Footer />
-      </div>
+        <Walker stage={stage} targets={targets} line={line} desktop={desktop} />
+      </main>
     </PublicShell>
   )
 }
