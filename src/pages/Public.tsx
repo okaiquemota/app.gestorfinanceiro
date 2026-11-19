@@ -4,7 +4,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { ArrowRight, Check, ChevronDown } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, Check, ChevronDown } from 'lucide-react'
 import { brl } from '../lib/format.ts'
 import { SITE, orTBD, ownerLine } from '../lib/site.ts'
 import { Link } from '../router.tsx'
@@ -192,7 +192,15 @@ function MonthStory() {
   return (
     <section id="mes" ref={track} aria-label="Um mês de exemplo, dia a dia" className="relative" style={{ height: `${DAYS * 22}vh` }}>
       <div className="sticky top-0 flex h-(--app-vh) flex-col overflow-hidden pt-16">
-        <div className="mx-auto grid min-h-0 w-full max-w-6xl flex-1 content-center items-stretch gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-5 lg:grid-cols-[1fr_1fr]">
+        {/* brilho atrás dos painéis: violeta no caminho, vermelho quando aperta, verde no fim */}
+        <div
+          aria-hidden
+          className={cx(
+            'pointer-events-none absolute left-1/2 top-1/2 h-[70%] w-[80%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[90px] transition-colors duration-700',
+            tense ? 'bg-[rgb(239_68_68/0.2)]' : done ? 'bg-[rgb(22_163_74/0.2)]' : 'bg-[rgb(124_58_237/0.16)]',
+          )}
+        />
+        <div className="relative mx-auto grid min-h-0 w-full max-w-6xl flex-1 content-center items-stretch gap-3 px-4 py-3 sm:gap-4 sm:px-5 sm:py-5 lg:grid-cols-[1fr_1fr]">
           {/* o saldo e o que acabou de acontecer */}
           <Panel className="flex min-h-0 flex-col p-4 sm:p-6">
             <div className="flex items-start justify-between gap-4">
@@ -297,14 +305,237 @@ function MonthStory() {
   )
 }
 
-const INSIDE: { title: string; text: string; emoji: string }[] = [
-  { title: 'Saldo previsto', text: 'Renda menos contas, cartões e dia a dia. O número que importa, já calculado.', emoji: 'money-bag' },
-  { title: 'Contas por vencimento', text: 'O que vence em cada dia, o que foi pago e o que atrasou.', emoji: 'calendar' },
-  { title: 'Cartões e parcelas', text: 'Cada compra na fatura certa, e as próximas faturas antes de chegarem.', emoji: 'card' },
-  { title: 'Os próximos 12 meses', text: 'Onde o mês vai apertar, com tempo de se preparar.', emoji: 'chart-up' },
-  { title: 'Reserva com metas', text: 'Quanto guardar por mês pra chegar no valor que você quer.', emoji: 'target' },
-  { title: 'No celular e no computador', text: 'Abre no navegador, sem instalar nada, com os mesmos dados nos dois.', emoji: 'phone' },
+// ---------- peças visuais do site ----------
+
+/** Barra colorida do "Saldo previsto", a mesma do app: cada cor é um destino do dinheiro. */
+const SERIES: { label: string; color: string; value: number }[] = [
+  { label: 'Moradia', color: 'var(--s-housing)', value: 348990 },
+  { label: 'Contas', color: 'var(--s-bills)', value: 335990 },
+  { label: 'Cartões', color: 'var(--s-cards)', value: 242790 },
+  { label: 'Reserva', color: 'var(--s-savings)', value: 150000 },
+  { label: 'Dia a dia', color: 'var(--s-daily)', value: 150000 },
+  { label: 'Sobra', color: 'var(--s-left)', value: 402230 },
 ]
+
+function SeriesBar({ className }: { className?: string }) {
+  return (
+    <div aria-hidden className={cx('flex h-2.5 gap-[2px] overflow-hidden rounded-full', className)}>
+      {SERIES.map((s) => (
+        <span key={s.label} style={{ flexGrow: s.value, background: s.color }} className="min-w-[3px] rounded-[2px]" />
+      ))}
+    </div>
+  )
+}
+
+/** Cartão de crédito no mesmo desenho do app. */
+function MiniCard({ className }: { className?: string }) {
+  return (
+    <div
+      aria-hidden
+      style={{ background: 'linear-gradient(135deg, #8a3df2 0%, #5a17c9 100%)' }}
+      className={cx('relative flex aspect-[1.6] flex-col justify-between overflow-hidden rounded-2xl p-4 text-white shadow-pop', className)}
+    >
+      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_40%,rgb(255_255_255/0.12)_50%,transparent_60%)]" />
+      <span className="relative flex items-start justify-between gap-2">
+        <span className="font-semibold">Cartão roxo</span>
+        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold">Aberta</span>
+      </span>
+      <span className="relative grid h-7 w-9 grid-cols-3 gap-px overflow-hidden rounded-md bg-black/20 p-px">
+        {Array.from({ length: 6 }, (_, i) => (
+          <span key={i} className="bg-white/80" />
+        ))}
+      </span>
+      <span className="relative flex items-end justify-between gap-2">
+        <span>
+          <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/60">FATURA</span>
+          <span className="tnum text-sm font-semibold">R$ 842,30</span>
+        </span>
+        <span className="text-right">
+          <span className="block text-[9px] font-semibold tracking-[0.1em] text-white/60">VENCE</span>
+          <span className="tnum text-sm font-semibold">12/12</span>
+        </span>
+      </span>
+    </div>
+  )
+}
+
+function HeroVisual() {
+  return (
+    <div className="relative mx-auto w-full max-w-[660px] pb-10 pt-6 lg:max-w-none">
+      <div aria-hidden className="absolute inset-x-6 inset-y-10 rounded-full bg-primary/25 blur-3xl" />
+      <div className="relative overflow-hidden rounded-panel border border-line bg-surface shadow-pop ring-8 ring-surface/60">
+        <img
+          src="/tela.webp"
+          alt={`Tela de visão geral do ${SITE.name}: saldo previsto, contas a pagar, categorias de gasto e cartões`}
+          width={1440}
+          height={900}
+          className="w-full"
+        />
+      </div>
+
+      {/* o número que importa, flutuando por cima do print */}
+      <div className="float-a absolute -bottom-2 left-2 w-[min(270px,72%)] rounded-2xl border border-line bg-surface p-4 shadow-pop sm:-left-8">
+        <p className="text-caption font-semibold text-muted">Saldo previsto</p>
+        <p className="tnum mt-1 text-[28px] font-semibold leading-none tracking-[-0.03em]">
+          <span className="text-ghost">R$ </span>4.022<span className="text-sm font-medium text-faint">,30</span>
+        </p>
+        <p className="mt-1.5 flex items-center gap-1 text-caption font-semibold text-good">
+          <ArrowUpRight size={14} strokeWidth={2.5} /> 25% da renda livre
+        </p>
+        <SeriesBar className="mt-3 h-2" />
+      </div>
+
+      <div className="float-b absolute -right-2 -top-2 hidden w-[200px] rotate-3 sm:block lg:-right-8">
+        <MiniCard />
+      </div>
+
+      <div className="float-b absolute -right-1 bottom-0 hidden items-center gap-2.5 rounded-2xl border border-line bg-surface py-2.5 pl-2.5 pr-4 shadow-pop sm:flex">
+        <span className="flex size-8 items-center justify-center rounded-full bg-good-fill text-white">
+          <Check size={16} strokeWidth={3} />
+        </span>
+        <span>
+          <span className="block text-caption font-semibold">Aluguel pago</span>
+          <span className="block text-micro text-muted">a sobra foi recalculada</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** 30 quadradinhos do mês, com um dia aceso. */
+function DayStrip({ lit, tone }: { lit: number; tone: 'dim' | 'bright' }) {
+  return (
+    <div aria-hidden className="grid grid-cols-10 gap-1.5">
+      {Array.from({ length: DAYS }, (_, i) => (
+        <span
+          key={i}
+          className={cx(
+            'aspect-square rounded-[5px]',
+            i + 1 === lit ? (tone === 'bright' ? 'bg-[#a78bfa] shadow-[0_0_16px_rgb(167_139_250/0.8)]' : 'bg-white/70') : 'bg-white/[0.07]',
+          )}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** Cartão do bento de recursos: título, frase e uma mini tela do app embaixo. */
+function Feature({ title, text, emoji, className, children }: { title: string; text: string; emoji: string; className?: string; children: ReactNode }) {
+  return (
+    <li className={cx('reveal', className)}>
+      <Panel className="group flex h-full flex-col overflow-hidden p-5 transition-shadow hover:shadow-pop sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lead font-semibold">{title}</h3>
+            <p className="mt-1 max-w-sm text-muted">{text}</p>
+          </div>
+          <Emoji name={emoji} size={52} className="-mr-1 -mt-1 drop-shadow-[0_8px_10px_rgb(0_0_0/0.12)] transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110" />
+        </div>
+        <div className="mt-5 flex flex-1 flex-col justify-end">{children}</div>
+      </Panel>
+    </li>
+  )
+}
+
+const FORECAST = [62, 48, 55, -12, 30, 44, 70, 58, 66, 40, 52, 80]
+const FORECAST_MONTHS = ['dez', 'jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov']
+
+function Features() {
+  return (
+    <ul className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <Feature title="Saldo previsto" text="Renda menos contas, cartões e dia a dia. O número que importa, já calculado." emoji="money-bag" className="md:col-span-2">
+        <div className="rounded-2xl bg-sunken p-4 sm:p-5">
+          <Money cents={402230} size="xl" />
+          <SeriesBar className="mt-4" />
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-caption text-muted">
+            {SERIES.map((s) => (
+              <li key={s.label} className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: s.color }} />
+                {s.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </Feature>
+
+      <Feature title="Contas por vencimento" text="O que vence em cada dia, o que foi pago e o que atrasou." emoji="calendar">
+        <ul className="divide-y divide-line rounded-2xl border border-line">
+          {[
+            { name: 'Aluguel', value: 'R$ 1.800', paid: true },
+            { name: 'Luz', value: 'R$ 189,90', tag: 'hoje' },
+            { name: 'Internet', value: 'R$ 119,90', tag: 'dia 15' },
+          ].map((r) => (
+            <li key={r.name} className="flex items-center gap-2.5 px-3 py-2.5">
+              <span
+                className={cx(
+                  'flex size-5 shrink-0 items-center justify-center rounded-full border-[1.5px]',
+                  r.paid ? 'border-good-fill bg-good-fill text-white' : 'border-control',
+                )}
+              >
+                {r.paid && <Check size={12} strokeWidth={3} />}
+              </span>
+              <span className={cx('flex-1 font-medium', r.paid && 'text-faint line-through')}>{r.name}</span>
+              {r.tag && <Badge tone={r.tag === 'hoje' ? 'warn' : 'neutral'}>{r.tag}</Badge>}
+              <span className={cx('tnum font-semibold', r.paid && 'text-faint')}>{r.value}</span>
+            </li>
+          ))}
+        </ul>
+      </Feature>
+
+      <Feature title="Cartões e parcelas" text="Cada compra na fatura certa, e as próximas faturas antes de chegarem." emoji="card">
+        <div className="flex items-end gap-3">
+          <MiniCard className="w-[62%] max-w-[220px] transition-transform duration-300 group-hover:-translate-y-1 group-hover:-rotate-2" />
+          <div className="min-w-0 flex-1 pb-1 text-caption">
+            <p className="text-muted">Notebook</p>
+            <p className="font-semibold">parcela 3 de 10</p>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sunken">
+              <div className="h-full w-[30%] rounded-full bg-primary" />
+            </div>
+          </div>
+        </div>
+      </Feature>
+
+      <Feature title="Os próximos 12 meses" text="Onde o mês vai apertar, com tempo de se preparar." emoji="chart-up">
+        <div className="flex h-28 items-center gap-1.5" aria-hidden>
+          {FORECAST.map((v, i) => (
+            <div key={i} className="flex h-full flex-1 flex-col items-center">
+              <div className="flex w-full flex-1 items-end">
+                {v > 0 && <div className="w-full rounded-t-[4px] bg-[var(--s-in)] opacity-80 transition-opacity group-hover:opacity-100" style={{ height: `${v}%` }} />}
+              </div>
+              <div className="h-px w-full bg-line-strong" />
+              <div className="flex w-full flex-[0.35] items-start">
+                {v < 0 && <div className="w-full rounded-b-[4px] bg-bad" style={{ height: `${-v * 3}%` }} />}
+              </div>
+              <span className={cx('text-[9px] leading-none', v < 0 ? 'font-semibold text-bad' : 'text-faint')}>{FORECAST_MONTHS[i]}</span>
+            </div>
+          ))}
+        </div>
+      </Feature>
+
+      <Feature title="Reserva com metas" text="Quanto guardar por mês pra chegar no valor que você quer." emoji="target">
+        <ul className="space-y-3">
+          {[
+            { name: 'Reserva de emergência', emoji: 'umbrella', pct: 64, color: 'var(--good-fill)' },
+            { name: 'Viagem de férias', emoji: 'plane', pct: 27, color: 'var(--primary)' },
+          ].map((g) => (
+            <li key={g.name} className="flex items-center gap-3">
+              <Emoji name={g.emoji} size={30} />
+              <div className="min-w-0 flex-1">
+                <div className="flex justify-between text-caption">
+                  <span className="truncate font-medium">{g.name}</span>
+                  <span className="tnum text-muted">{g.pct}%</span>
+                </div>
+                <div className="mt-1 h-2 overflow-hidden rounded-full bg-sunken">
+                  <div className="h-full rounded-full" style={{ width: `${g.pct}%`, background: g.color }} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Feature>
+    </ul>
+  )
+}
 
 const FAQ: [string, string][] = [
   ['O Poupin se conecta ao meu banco?', 'Não. Você mesmo cadastra renda, contas e cartões. O Poupin nunca pede senha de banco nem acesso à sua conta bancária.'],
@@ -354,98 +585,101 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
         <Header authenticated={authenticated} floating />
         <main>
           {/* ---------- abertura ---------- */}
-          <section className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-28 sm:pt-32 lg:min-h-(--app-vh) lg:grid-cols-[1fr_1.1fr] lg:pb-20">
-            <div>
-              {!authenticated && <Badge tone="primary">{plan.trial_days} dias grátis · sem cartão</Badge>}
-              <h1 className="mt-4 text-[clamp(2.25rem,4.6vw,3.5rem)] font-semibold leading-[1.06] tracking-[-0.035em] text-balance">
-                Saiba hoje quanto vai sobrar no fim do mês.
-              </h1>
-              <p className="mt-5 max-w-lg text-lg text-muted">
-                O {SITE.name} junta sua renda, suas contas e as faturas dos cartões numa tela só, e refaz a conta a cada coisa que você paga.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link href={start} className={linkButton('primary', 'lg')}>
-                  {startLabel} <ArrowRight size={18} />
-                </Link>
-                <a href="#mes" className={linkButton('secondary', 'lg')}>
-                  Ver um mês de exemplo
-                </a>
+          <section className="relative overflow-hidden">
+            <div aria-hidden className="hero-glow pointer-events-none absolute inset-0" />
+            <div aria-hidden className="hero-grid pointer-events-none absolute inset-0" />
+            <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 pb-16 pt-28 sm:pt-32 lg:min-h-(--app-vh) lg:grid-cols-[1fr_1.1fr] lg:pb-20">
+              <div className="hero-in">
+                {!authenticated && (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 py-1 pl-1 pr-3 text-caption font-medium shadow-card backdrop-blur">
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-micro font-semibold text-on-primary">{plan.trial_days} dias grátis</span>
+                    sem cartão de crédito
+                  </span>
+                )}
+                <h1 className="mt-5 text-balance text-[clamp(2.4rem,5vw,3.9rem)] font-semibold leading-[1.04] tracking-[-0.04em]">
+                  Saiba hoje quanto vai <span className="text-gradient">sobrar</span> no fim do mês.
+                </h1>
+                <p className="mt-5 max-w-lg text-lg text-muted">
+                  O {SITE.name} junta sua renda, suas contas e as faturas dos cartões numa tela só, e refaz a conta a cada coisa que você paga.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <Link href={start} className={cx(linkButton('primary', 'lg'), 'shadow-[0_8px_24px_rgb(124_58_237/0.35)]')}>
+                    {startLabel} <ArrowRight size={18} />
+                  </Link>
+                  <a href="#mes" className={linkButton('secondary', 'lg')}>
+                    Ver um mês de exemplo
+                  </a>
+                </div>
+                <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-caption text-muted">
+                  {['Sem conectar ao banco', 'Celular e computador', 'Cancele quando quiser'].map((t) => (
+                    <li key={t} className="flex items-center gap-1.5">
+                      <Check size={15} strokeWidth={2.5} className="text-good" />
+                      {t}
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-caption text-muted">
-                {['Sem conectar ao banco', 'Celular e computador', 'Cancele quando quiser'].map((t) => (
-                  <li key={t} className="flex items-center gap-1.5">
-                    <Check size={15} strokeWidth={2.5} className="text-good" />
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="overflow-hidden rounded-panel border border-line bg-surface shadow-pop">
-              <img
-                src="/tela.webp"
-                alt={`Tela de visão geral do ${SITE.name}: saldo previsto, contas a pagar, categorias de gasto e cartões`}
-                width={1440}
-                height={900}
-                className="w-full"
-              />
+              <HeroVisual />
             </div>
           </section>
 
           {/* ---------- o mês de exemplo ---------- */}
-          <div className="mx-auto max-w-6xl px-5">
+          <div className="mx-auto max-w-6xl px-5 pt-10">
             <SectionTitle kicker="Um mês de exemplo">Role a página: cada rolada é um dia do mês.</SectionTitle>
             <p className="reveal mt-3 max-w-xl text-lg text-muted">O salário cai, as contas chegam, e no fim você descobre quanto sobrou.</p>
           </div>
           <MonthStory />
 
-          {/* ---------- a virada ---------- */}
-          <section className="mx-auto max-w-6xl px-5 py-20 sm:py-24">
-            <SectionTitle kicker="A diferença">Sobraram {brl(LEFTOVER)}. Mas você só descobriu no dia 30.</SectionTitle>
-            <div className="mt-8 grid gap-4 md:grid-cols-2">
-              <Panel className="reveal p-5 sm:p-6">
-                <p className="text-caption font-semibold text-muted">Sem planejar</p>
-                <p className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-faint">Dia 30</p>
-                <p className="mt-2 text-muted">Você descobre o que sobrou quando o mês já acabou e não dá mais pra ajustar nada.</p>
-              </Panel>
-              <Panel className="reveal border-primary/40 p-5 ring-1 ring-primary/15 sm:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-caption font-semibold text-accent">Com o {SITE.name}</p>
-                    <p className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Dia 1</p>
+          {/* ---------- a virada: faixa escura ---------- */}
+          <section className="relative overflow-hidden bg-[#110d22] text-white">
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(50%_60%_at_80%_20%,rgb(124_58_237/0.35),transparent_70%),radial-gradient(40%_50%_at_0%_100%,rgb(236_72_153/0.15),transparent_70%)]" />
+            <div className="relative mx-auto max-w-6xl px-5 py-20 sm:py-28">
+              <div className="reveal">
+                <p className="text-caption font-semibold text-[#b79cfb]">A diferença</p>
+                <h2 className="mt-2 max-w-3xl text-balance text-[clamp(1.9rem,4.4vw,3.25rem)] font-semibold leading-[1.06] tracking-[-0.035em]">
+                  Sobraram {brl(LEFTOVER)}. Mas você só descobriu no dia 30.
+                </h2>
+              </div>
+              <div className="mt-10 grid gap-4 md:grid-cols-2">
+                <div className="reveal rounded-panel border border-white/10 bg-white/[0.04] p-6 sm:p-7">
+                  <p className="text-caption font-semibold text-white/50">Sem planejar</p>
+                  <p className="mt-2 text-4xl font-semibold tracking-[-0.03em] text-white/50">Dia 30</p>
+                  <p className="mt-2 max-w-sm text-white/60">Você descobre o que sobrou quando o mês já acabou e não dá mais pra ajustar nada.</p>
+                  <div className="mt-6 max-w-xs">
+                    <DayStrip lit={30} tone="dim" />
                   </div>
-                  <Emoji name="mascote-moeda" size={64} className="drop-shadow-[0_8px_10px_rgb(0_0_0/0.12)]" />
                 </div>
-                <p className="mt-2 text-muted">
-                  O saldo previsto aparece no começo do mês e se atualiza a cada conta paga. Dá tempo de cortar, adiar ou guardar.
-                </p>
-              </Panel>
+                <div
+                  className="reveal relative overflow-hidden rounded-panel border border-[#a78bfa]/40 bg-[linear-gradient(160deg,rgb(124_58_237/0.35),rgb(124_58_237/0.08))] p-6 shadow-[0_20px_60px_rgb(124_58_237/0.25)] sm:p-7"
+                  style={delay(100)}
+                >
+                  <Emoji name="mascote-moeda" size={88} className="mascot absolute right-5 top-5 drop-shadow-[0_12px_18px_rgb(0_0_0/0.4)]" />
+                  <p className="text-caption font-semibold text-[#c4b5fd]">Com o {SITE.name}</p>
+                  <p className="mt-2 text-4xl font-semibold tracking-[-0.03em]">Dia 1</p>
+                  <p className="mt-2 max-w-sm pr-16 text-white/75">
+                    O saldo previsto aparece no começo do mês e se atualiza a cada conta paga. Dá tempo de cortar, adiar ou guardar.
+                  </p>
+                  <div className="mt-6 max-w-xs">
+                    <DayStrip lit={1} tone="bright" />
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 
           {/* ---------- o que tem dentro ---------- */}
-          <section aria-labelledby="dentro" className="mx-auto max-w-6xl px-5 pb-20 sm:pb-24">
+          <section aria-labelledby="dentro" className="mx-auto max-w-6xl px-5 py-20 sm:py-28">
             <SectionTitle id="dentro" kicker="O que tem dentro">
               Tudo o que mexe no seu mês, num lugar só.
             </SectionTitle>
-            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {INSIDE.map(({ title, text, emoji }, i) => (
-                <li key={title} className="reveal" style={delay((i % 3) * 60)}>
-                  <Panel className="h-full p-5 sm:p-6">
-                    <div className="flex items-start justify-between gap-3">
-                      <h3 className="text-lead font-semibold">{title}</h3>
-                      <Emoji name={emoji} size={52} className="-mr-1 -mt-1 drop-shadow-[0_8px_10px_rgb(0_0_0/0.12)]" />
-                    </div>
-                    <p className="mt-1 text-muted">{text}</p>
-                  </Panel>
-                </li>
-              ))}
-            </ul>
+            <Features />
           </section>
 
           {/* ---------- preço ---------- */}
           <section id="preco" aria-labelledby="preco-titulo" className="mx-auto max-w-6xl scroll-mt-20 px-5 pb-20 sm:pb-24">
-            <Panel className="reveal grid gap-6 p-6 sm:p-8 md:grid-cols-[1.2fr_0.8fr] md:items-center">
-              <div>
+            <Panel className="reveal relative grid gap-6 overflow-hidden p-6 sm:p-10 md:grid-cols-[1.2fr_0.8fr] md:items-center">
+              <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-primary/15 blur-3xl" />
+              <div className="relative">
                 <h2 id="preco-titulo" className="text-caption font-semibold text-accent">
                   Quanto custa
                 </h2>
@@ -455,7 +689,9 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                     <span className="text-lg text-muted">por mês</span>
                   </p>
                 ) : (
-                  <p className="mt-3 text-[clamp(2rem,5vw,2.75rem)] font-semibold leading-tight tracking-[-0.035em]">Grátis no lançamento.</p>
+                  <p className="mt-3 text-[clamp(2.1rem,5vw,3rem)] font-semibold leading-tight tracking-[-0.035em]">
+                    <span className="text-gradient">Grátis</span> no lançamento.
+                  </p>
                 )}
                 <p className="mt-3 max-w-lg text-muted">
                   {plan.billing_enabled
@@ -463,7 +699,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                     : `A assinatura ainda não foi aberta. Enquanto isso, o uso é gratuito e tem tudo liberado.`}
                 </p>
               </div>
-              <div className="md:text-right">
+              <div className="relative md:text-right">
                 <Link href={start} className={linkButton('primary', 'lg')}>
                   {authenticated ? 'Abrir o app' : 'Começar agora'} <ArrowRight size={18} />
                 </Link>
@@ -472,11 +708,23 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
           </section>
 
           {/* ---------- dúvidas ---------- */}
-          <section aria-labelledby="duvidas-titulo" className="mx-auto max-w-6xl px-5 pb-20 sm:pb-24">
-            <SectionTitle id="duvidas-titulo" kicker="Dúvidas">
-              Perguntas frequentes
-            </SectionTitle>
-            <Panel className="reveal mt-8 divide-y divide-line overflow-hidden">
+          <section aria-labelledby="duvidas-titulo" className="mx-auto grid max-w-6xl gap-8 px-5 pb-20 sm:pb-24 lg:grid-cols-[0.8fr_1.2fr]">
+            <div>
+              <SectionTitle id="duvidas-titulo" kicker="Dúvidas">
+                Perguntas frequentes
+              </SectionTitle>
+              <p className="reveal mt-3 max-w-sm text-muted">
+                Não achou a sua?{' '}
+                {SITE.supportEmail ? (
+                  <a href={`mailto:${SITE.supportEmail}`} className="font-semibold text-accent">
+                    Escreva pra gente.
+                  </a>
+                ) : (
+                  'Escreva pra gente.'
+                )}
+              </p>
+            </div>
+            <Panel className="reveal divide-y divide-line overflow-hidden">
               {FAQ.map(([q, a]) => (
                 <Question key={q} q={q} a={a} />
               ))}
@@ -485,17 +733,23 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
 
           {/* ---------- fecho ---------- */}
           <section className="mx-auto max-w-6xl px-5 pb-10">
-            <Panel className="reveal flex flex-col items-center px-6 py-12 text-center sm:py-16">
-              <Emoji name="mascote-oi" size={88} className="mascot drop-shadow-[0_12px_14px_rgb(0_0_0/0.14)]" />
-              <h2 className="mt-4 max-w-xl text-[clamp(1.75rem,3.6vw,2.5rem)] font-semibold leading-[1.1] tracking-[-0.03em]">
-                E o seu mês, como termina?
-              </h2>
-              <p className="mt-3 max-w-md text-muted">Cadastre renda, contas e cartões em poucos minutos e veja a sobra do mês na hora.</p>
-              <Link href={start} className={cx(linkButton('primary', 'lg'), 'mt-7')}>
-                {startLabel} <ArrowRight size={18} />
-              </Link>
-              {!authenticated && <p className="mt-3 text-caption text-muted">Sem cartão de crédito.</p>}
-            </Panel>
+            <div className="reveal relative overflow-hidden rounded-panel bg-[linear-gradient(135deg,#7c3aed_0%,#5b21b6_60%,#4c1d95_100%)] px-6 py-14 text-center text-white shadow-[0_24px_60px_rgb(124_58_237/0.3)] sm:py-20">
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(40%_60%_at_15%_0%,rgb(255_255_255/0.18),transparent_70%),radial-gradient(35%_55%_at_90%_100%,rgb(236_72_153/0.35),transparent_70%)]" />
+              <div className="relative flex flex-col items-center">
+                <Emoji name="mascote-festa" size={104} className="mascot drop-shadow-[0_14px_20px_rgb(0_0_0/0.3)]" />
+                <h2 className="mt-4 max-w-xl text-balance text-[clamp(2rem,4.4vw,3rem)] font-semibold leading-[1.06] tracking-[-0.035em]">
+                  E o seu mês, como termina?
+                </h2>
+                <p className="mt-3 max-w-md text-white/80">Cadastre renda, contas e cartões em poucos minutos e veja a sobra do mês na hora.</p>
+                <Link
+                  href={start}
+                  className="mt-8 inline-flex h-12 items-center gap-1.5 rounded-xl bg-white px-6 text-lead font-semibold text-[#5b21b6] shadow-[0_8px_24px_rgb(0_0_0/0.2)] transition-transform hover:-translate-y-0.5"
+                >
+                  {startLabel} <ArrowRight size={18} />
+                </Link>
+                {!authenticated && <p className="mt-3 text-caption text-white/70">Sem cartão de crédito.</p>}
+              </div>
+            </div>
           </section>
         </main>
         <Footer />

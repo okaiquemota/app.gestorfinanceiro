@@ -395,7 +395,58 @@ main:focus {
   animation: pop 0.14s ease-out;
 }
 
-/* ---------- site público ---------- */
+/* ---------- site público ----------
+ * Mesmas peças do app, com um pouco mais de palco: brilho violeta atrás da
+ * abertura, grade bem leve, palavra-chave em degradê e cards que flutuam.
+ */
+.hero-glow {
+  background:
+    radial-gradient(45% 55% at 78% 40%, rgb(124 58 237 / 0.18), transparent 70%),
+    radial-gradient(35% 45% at 95% 90%, rgb(236 72 153 / 0.1), transparent 70%),
+    radial-gradient(40% 40% at 5% 5%, rgb(42 120 214 / 0.08), transparent 70%);
+}
+.hero-grid {
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 35%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 35%, #000 20%, transparent 75%);
+  opacity: 0.7;
+}
+.text-gradient {
+  background: linear-gradient(95deg, #7c3aed 0%, #a21caf 55%, #db2777 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+:root[data-theme='dark'] .text-gradient {
+  background-image: linear-gradient(95deg, #a78bfa 0%, #e879f9 55%, #f472b6 100%);
+}
+@keyframes drift {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.float-a {
+  animation: drift 6s ease-in-out infinite;
+}
+.float-b {
+  animation: drift 7s ease-in-out -3s infinite;
+}
+.hero-in > * {
+  animation: rise-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.hero-in > :nth-child(2) {
+  animation-delay: 60ms;
+}
+.hero-in > :nth-child(3) {
+  animation-delay: 120ms;
+}
+.hero-in > :nth-child(n + 4) {
+  animation-delay: 180ms;
+}
+
 
 /* entra ao rolar: só sobe e aparece (o JS liga .in quando o bloco chega na tela) */
 .reveal {
