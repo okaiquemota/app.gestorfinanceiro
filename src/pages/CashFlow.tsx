@@ -166,7 +166,7 @@ export function CashFlow() {
       <Panel className="fit-grow fit-scroll overflow-hidden">
         <h2 className="px-4 pt-4 text-lead font-semibold sm:px-6 sm:pt-5">Mês a mês</h2>
         <p className="px-4 text-caption text-muted sm:px-6">Toque no mês pra abrir ele na visão geral.</p>
-        <div className="mt-3 overflow-x-auto">
+        <div className="no-scrollbar mt-3 overflow-x-auto">
           <table className="tnum w-full whitespace-nowrap text-right text-caption md:min-w-[680px]">
             <thead>
               <tr className="border-b border-line text-xs text-muted">

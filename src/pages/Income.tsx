@@ -72,7 +72,7 @@ export function Income() {
         )}
       </Panel>
 
-      <Panel className="fit-scroll fit:max-h-full self-start p-4 sm:p-6">
+      <Panel className="fit-scroll fit:max-h-full self-start fit:self-stretch p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lead font-semibold">Dia a dia</h2>

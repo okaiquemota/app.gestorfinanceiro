@@ -592,3 +592,43 @@ main:focus {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
+
+/* coluna de cards: o último card estica até o fim, sem deixar buraco embaixo */
+[data-fit] .fit-stack {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+[data-fit] .fit-stack > * {
+  flex-shrink: 0;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+[data-fit] .fit-stack > section:last-of-type {
+  flex-grow: 1;
+}
+
+/* Barras de rolagem escondidas em todo o app: os cards continuam rolando com a
+   roda do mouse, o trackpad ou o toque, mas sem a barra aparecendo. E nada rola
+   de lado sem querer (ex.: o carrossel de cartões sangrando para a borda). */
+html,
+.fit-scroll,
+.fit-stack,
+.scroll-thin {
+  scrollbar-width: none !important;
+}
+html::-webkit-scrollbar,
+.fit-scroll::-webkit-scrollbar,
+.fit-stack::-webkit-scrollbar,
+.scroll-thin::-webkit-scrollbar {
+  display: none;
+}
+[data-fit] .fit-scroll,
+[data-fit] .fit-stack,
+[data-fit] .scroll-thin {
+  overflow-x: hidden !important;
+}

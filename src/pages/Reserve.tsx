@@ -1,16 +1,26 @@
-import { Minus, Pencil, Plus, Trash2 } from 'lucide-react'
-import { goalBalance, monthDiff } from '../../shared/finance.ts'
-import { Meter } from '../components.tsx'
-import { api } from '../lib/api.ts'
-import { achievements, streak } from '../lib/fun.ts'
-import { brl, currentMonth, dateBR, monthLong, pct } from '../lib/format.ts'
-import { useStore } from '../store.tsx'
-import { Amount, Button, ConfirmButton, Emoji, EmptyState, IconButton, Money, Panel, cx } from '../ui.tsx'
+import { Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { goalBalance, monthDiff } from "../../shared/finance.ts";
+import { Meter } from "../components.tsx";
+import { api } from "../lib/api.ts";
+import { achievements, streak } from "../lib/fun.ts";
+import { brl, currentMonth, dateBR, monthLong, pct } from "../lib/format.ts";
+import { useStore } from "../store.tsx";
+import {
+  Amount,
+  Button,
+  ConfirmButton,
+  Emoji,
+  EmptyState,
+  IconButton,
+  Money,
+  Panel,
+  cx,
+} from "../ui.tsx";
 
 export function Reserve() {
-  const { state, openForm, run } = useStore()
-  const total = state.goals.reduce((s, g) => s + goalBalance(state, g), 0)
-  const names = new Map(state.goals.map((g) => [g.id, g.name]))
+  const { state, openForm, run } = useStore();
+  const total = state.goals.reduce((s, g) => s + goalBalance(state, g), 0);
+  const names = new Map(state.goals.map((g) => [g.id, g.name]));
 
   if (state.goals.length === 0)
     return (
@@ -21,16 +31,17 @@ export function Reserve() {
           action={
             <Button
               variant="primary"
-              onClick={() => openForm({ type: 'goal' })}
+              onClick={() => openForm({ type: "goal" })}
             >
               Criar primeira meta
             </Button>
           }
         >
-          Crie uma meta (reserva de emergência, viagem, entrada do apartamento…) e registre o que for guardando.
+          Crie uma meta (reserva de emergência, viagem, entrada do apartamento…)
+          e registre o que for guardando.
         </EmptyState>
       </Panel>
-    )
+    );
 
   return (
     <div className="fit-page space-y-3 sm:space-y-4">
@@ -40,7 +51,7 @@ export function Reserve() {
           <Money cents={total} className="mt-1" />
         </div>
         <div className="flex items-center gap-4">
-          <Button variant="primary" onClick={() => openForm({ type: 'goal' })}>
+          <Button variant="primary" onClick={() => openForm({ type: "goal" })}>
             <Plus size={16} strokeWidth={2.5} /> Nova meta
           </Button>
           <Emoji name="money-bag" size={64} className="hidden sm:block" />
@@ -49,117 +60,198 @@ export function Reserve() {
 
       {/* no computador: metas, histórico e conquistas lado a lado, cada um rolando por dentro */}
       <div className="fit-grow fit-grid space-y-3 sm:space-y-4 fit:grid fit:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 sm:gap-4 fit:gap-4 fit:space-y-0">
-      <div className="fit-scroll grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3 fit:content-start fit:p-0.5 fit:md:grid-cols-1 fit:2xl:grid-cols-2">
-        {state.goals.map((goal) => {
-          const balance = goalBalance(state, goal)
-          const left = goal.target_cents - balance
-          const months = goal.deadline ? monthDiff(currentMonth(), goal.deadline) : 0
-          return (
-            <Panel key={goal.id} className="flex flex-col p-4 sm:p-5">
-              <div className="flex items-start gap-3">
-                <Emoji name={goal.icon} size={48} />
-                <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-lead font-semibold">{goal.name}</h2>
-                  <Money cents={balance} size="lg" className="mt-1.5" />
-                </div>
-                <IconButton label={`Editar ${goal.name}`} onClick={() => openForm({ type: 'goal', goal })} className="-mr-2 -mt-1">
-                  <Pencil size={15} />
-                </IconButton>
-              </div>
-              {goal.target_cents > 0 && (
-                <>
-                  <Meter
-                    value={balance}
-                    max={goal.target_cents}
-                    color="var(--good-fill)"
-                    label={`${pct(balance, goal.target_cents)} da meta`}
-                    className="mt-4"
-                  />
-                  <p className="tnum mt-2 flex justify-between text-xs text-muted">
-                    <span className="font-semibold text-fg">{pct(balance, goal.target_cents)}</span>
-                    <span>meta de {brl(goal.target_cents)}</span>
-                  </p>
-                  <p className="mt-2 text-caption text-muted">
-                    {left <= 0
-                      ? 'Meta batida 🎉'
-                      : goal.deadline && months > 0
-                        ? `Faltam ${brl(left)} — ${brl(Math.ceil(left / months))} por mês até ${monthLong(goal.deadline)}.`
-                        : `Faltam ${brl(left)}.`}
-                  </p>
-                </>
-              )}
-              <div className="mt-auto flex gap-2 pt-4">
-                <Button variant="primary" className="flex-1" onClick={() => openForm({ type: 'move', goalId: goal.id, direction: 'in' })}>
-                  <Plus size={16} strokeWidth={2.5} /> Guardar
-                </Button>
-                <Button className="flex-1" onClick={() => openForm({ type: 'move', goalId: goal.id, direction: 'out' })}>
-                  <Minus size={16} strokeWidth={2.5} /> Retirar
-                </Button>
-              </div>
-            </Panel>
-          )
-        })}
-      </div>
-
-      <Panel className="fit-scroll p-4 sm:p-6">
-        <h2 className="text-lead font-semibold">Histórico</h2>
-        {state.goalMoves.length === 0 ? (
-          <p className="py-8 text-center text-muted">Nada guardado ainda. Use “Guardar” em uma das metas.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-line">
-            {state.goalMoves.slice(0, 50).map((m) => (
-              <li key={m.id} className="flex items-center gap-3 py-2.5">
-                <span
-                  className={cx(
-                    'flex size-8 shrink-0 items-center justify-center rounded-full max-[380px]:hidden',
-                    m.amount_cents >= 0 ? 'bg-good-soft text-good' : 'bg-bad-soft text-bad',
-                  )}
-                >
-                  {m.amount_cents >= 0 ? <Plus size={15} strokeWidth={2.5} /> : <Minus size={15} strokeWidth={2.5} />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{names.get(m.goal_id)}</span>
-                  <span className="block truncate text-xs text-muted">
-                    {dateBR(m.date)}
-                    {m.note && ` · ${m.note}`}
-                  </span>
-                </span>
-                <Amount cents={m.amount_cents} className={m.amount_cents < 0 ? 'text-bad' : undefined} />
-                {/* depósitos que vieram de uma conta paga se desfazem desmarcando a conta */}
-                {m.entry_id ? (
-                  <span className="size-10 max-sm:hidden" />
-                ) : (
-                  <ConfirmButton
-                    label="Excluir movimentação"
-                    onConfirm={() => run(() => api('DELETE', `/goal-moves/${m.id}`), { success: 'Movimentação excluída.' })}
+        {/* todas as metas num card só, que ocupa a coluna inteira e rola por dentro */}
+        <Panel className="fit-scroll flex flex-col p-4 sm:p-6">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-lead font-semibold">Metas</h2>
+            <span className="text-caption text-muted">
+              {state.goals.length === 1
+                ? "1 meta"
+                : `${state.goals.length} metas`}
+            </span>
+          </div>
+          {state.goals.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10 text-center">
+              <Emoji name="mascote-moeda" size={88} className="mascot" />
+              <p className="max-w-xs text-muted">
+                Crie uma meta pra começar a guardar: reserva de emergência,
+                viagem, um sonho…
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => openForm({ type: "goal" })}
+              >
+                <Plus size={16} strokeWidth={2.5} /> Nova meta
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-3 grid gap-3 md:grid-cols-2 fit:md:grid-cols-1 fit:2xl:grid-cols-2">
+              {state.goals.map((goal) => {
+                const balance = goalBalance(state, goal);
+                const left = goal.target_cents - balance;
+                const months = goal.deadline
+                  ? monthDiff(currentMonth(), goal.deadline)
+                  : 0;
+                return (
+                  <div
+                    key={goal.id}
+                    className="flex flex-col rounded-2xl border border-line p-4"
                   >
-                    <Trash2 size={15} />
-                  </ConfirmButton>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+                    <div className="flex items-start gap-3">
+                      <Emoji name={goal.icon} size={48} />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-lead font-semibold">
+                          {goal.name}
+                        </h3>
+                        <Money cents={balance} size="lg" className="mt-1.5" />
+                      </div>
+                      <IconButton
+                        label={`Editar ${goal.name}`}
+                        onClick={() => openForm({ type: "goal", goal })}
+                        className="-mr-2 -mt-1"
+                      >
+                        <Pencil size={15} />
+                      </IconButton>
+                    </div>
+                    {goal.target_cents > 0 && (
+                      <>
+                        <Meter
+                          value={balance}
+                          max={goal.target_cents}
+                          color="var(--good-fill)"
+                          label={`${pct(balance, goal.target_cents)} da meta`}
+                          className="mt-4"
+                        />
+                        <p className="tnum mt-2 flex justify-between text-xs text-muted">
+                          <span className="font-semibold text-fg">
+                            {pct(balance, goal.target_cents)}
+                          </span>
+                          <span>meta de {brl(goal.target_cents)}</span>
+                        </p>
+                        <p className="mt-2 text-caption text-muted">
+                          {left <= 0
+                            ? "Meta batida 🎉"
+                            : goal.deadline && months > 0
+                              ? `Faltam ${brl(left)} — ${brl(Math.ceil(left / months))} por mês até ${monthLong(goal.deadline)}.`
+                              : `Faltam ${brl(left)}.`}
+                        </p>
+                      </>
+                    )}
+                    <div className="mt-auto flex gap-2 pt-4">
+                      <Button
+                        variant="primary"
+                        className="flex-1"
+                        onClick={() =>
+                          openForm({
+                            type: "move",
+                            goalId: goal.id,
+                            direction: "in",
+                          })
+                        }
+                      >
+                        <Plus size={16} strokeWidth={2.5} /> Guardar
+                      </Button>
+                      <Button
+                        className="flex-1"
+                        onClick={() =>
+                          openForm({
+                            type: "move",
+                            goalId: goal.id,
+                            direction: "out",
+                          })
+                        }
+                      >
+                        <Minus size={16} strokeWidth={2.5} /> Retirar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Panel>
 
-      <AchievementsPanel />
+        <Panel className="fit-scroll p-4 sm:p-6">
+          <h2 className="text-lead font-semibold">Histórico</h2>
+          {state.goalMoves.length === 0 ? (
+            <p className="py-8 text-center text-muted">
+              Nada guardado ainda. Use “Guardar” em uma das metas.
+            </p>
+          ) : (
+            <ul className="mt-2 divide-y divide-line">
+              {state.goalMoves.slice(0, 50).map((m) => (
+                <li key={m.id} className="flex items-center gap-3 py-2.5">
+                  <span
+                    className={cx(
+                      "flex size-8 shrink-0 items-center justify-center rounded-full max-[380px]:hidden",
+                      m.amount_cents >= 0
+                        ? "bg-good-soft text-good"
+                        : "bg-bad-soft text-bad",
+                    )}
+                  >
+                    {m.amount_cents >= 0 ? (
+                      <Plus size={15} strokeWidth={2.5} />
+                    ) : (
+                      <Minus size={15} strokeWidth={2.5} />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {names.get(m.goal_id)}
+                    </span>
+                    <span className="block truncate text-xs text-muted">
+                      {dateBR(m.date)}
+                      {m.note && ` · ${m.note}`}
+                    </span>
+                  </span>
+                  <Amount
+                    cents={m.amount_cents}
+                    className={m.amount_cents < 0 ? "text-bad" : undefined}
+                  />
+                  {/* depósitos que vieram de uma conta paga se desfazem desmarcando a conta */}
+                  {m.entry_id ? (
+                    <span className="size-10 max-sm:hidden" />
+                  ) : (
+                    <ConfirmButton
+                      label="Excluir movimentação"
+                      onConfirm={() =>
+                        run(() => api("DELETE", `/goal-moves/${m.id}`), {
+                          success: "Movimentação excluída.",
+                        })
+                      }
+                    >
+                      <Trash2 size={15} />
+                    </ConfirmButton>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <AchievementsPanel />
       </div>
     </div>
-  )
+  );
 }
 
 function AchievementsPanel() {
-  const { state } = useStore()
-  const list = achievements(state)
-  const run = streak(state)
-  const done = list.filter((a) => a.done).length
+  const { state } = useStore();
+  const list = achievements(state);
+  const run = streak(state);
+  const done = list.filter((a) => a.done).length;
   return (
     <Panel className="fit-scroll p-4 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lead font-semibold">Conquistas</h2>
         <p className="text-caption text-muted">
           {done} de {list.length}
-          {run > 0 && <> · {run === 1 ? '1 mês seguido' : `${run} meses seguidos`} no azul</>}
+          {run > 0 && (
+            <>
+              {" "}
+              · {run === 1 ? "1 mês seguido" : `${run} meses seguidos`} no azul
+            </>
+          )}
         </p>
       </div>
       {/* no celular, duas por linha: ícone em cima, texto embaixo */}
@@ -168,19 +260,33 @@ function AchievementsPanel() {
           <li
             key={a.id}
             className={cx(
-              'flex flex-col items-start gap-1.5 rounded-2xl border p-3 sm:flex-row sm:items-center sm:gap-3',
-              a.done ? 'border-line bg-surface' : 'border-dashed border-line-strong',
+              "flex flex-col items-start gap-1.5 rounded-2xl border p-3 sm:flex-row sm:items-center sm:gap-3",
+              a.done
+                ? "border-line bg-surface"
+                : "border-dashed border-line-strong",
             )}
           >
-            <Emoji name={a.emoji} size={36} className={a.done ? undefined : 'opacity-35 grayscale'} />
+            <Emoji
+              name={a.emoji}
+              size={36}
+              className={a.done ? undefined : "opacity-35 grayscale"}
+            />
             <span className="min-w-0">
-              <span className={cx('block font-semibold', !a.done && 'text-muted')}>{a.title}</span>
-              <span className="block text-xs text-muted sm:text-caption">{a.text}</span>
-              <span className="sr-only">{a.done ? ' (conquistada)' : ' (ainda não)'}</span>
+              <span
+                className={cx("block font-semibold", !a.done && "text-muted")}
+              >
+                {a.title}
+              </span>
+              <span className="block text-xs text-muted sm:text-caption">
+                {a.text}
+              </span>
+              <span className="sr-only">
+                {a.done ? " (conquistada)" : " (ainda não)"}
+              </span>
             </span>
           </li>
         ))}
       </ul>
     </Panel>
-  )
+  );
 }
