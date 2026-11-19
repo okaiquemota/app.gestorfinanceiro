@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { ArrowDown, ArrowRight } from 'lucide-react'
 import { brl } from '../lib/format.ts'
-import { SITE, orTBD } from '../lib/site.ts'
+import { SITE, orTBD, ownerLine } from '../lib/site.ts'
 import { Link } from '../router.tsx'
 import { Emoji, cx } from '../ui.tsx'
 
@@ -473,8 +473,7 @@ export function Terms({ plan, authenticated }: { plan: PublicPlan; authenticated
       <section>
         <h2>1. O serviço</h2>
         <p>
-          O {SITE.name} é um aplicativo de organização financeira pessoal oferecido por {orTBD(SITE.owner)}, inscrito sob o nº{' '}
-          {orTBD(SITE.ownerDocument)} (“nós”). Ele permite cadastrar rendas, contas, cartões de crédito e metas, e calcula
+          O {SITE.name} é um aplicativo de organização financeira pessoal oferecido por {ownerLine()} (“nós”). Ele permite cadastrar rendas, contas, cartões de crédito e metas, e calcula
           estimativas a partir do que você informa.
         </p>
         <p>
@@ -548,7 +547,7 @@ export function Terms({ plan, authenticated }: { plan: PublicPlan; authenticated
       <section>
         <h2>8. Contato e foro</h2>
         <p>
-          Dúvidas e solicitações: {contact()}. Estes termos são regidos pelas leis brasileiras. Fica eleito o foro de{' '}
+          Dúvidas e solicitações: {contact()}. Estes termos são regidos pelas leis brasileiras. Fica eleito o foro da Comarca de{' '}
           {orTBD(SITE.jurisdiction)}, sem prejuízo do direito do consumidor de acionar o foro do seu domicílio.
         </p>
       </section>
@@ -562,8 +561,8 @@ export function Privacy({ authenticated }: { authenticated?: boolean }) {
       <section>
         <h2>1. Quem trata seus dados</h2>
         <p>
-          O controlador dos dados pessoais tratados no {SITE.name} é {orTBD(SITE.owner)}, inscrito sob o nº{' '}
-          {orTBD(SITE.ownerDocument)}. Contato para assuntos de privacidade (encarregado): {contact()}.
+          O controlador dos dados pessoais tratados no {SITE.name} é {ownerLine()}. Os encarregados pelo tratamento de
+          dados (DPO) são {orTBD(SITE.dpo)}, pelo e-mail {contact()}.
         </p>
       </section>
       <section>

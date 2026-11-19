@@ -27,8 +27,8 @@ export function Subscribe() {
   const pose = b.status === 'expired' ? 'mascote-preocupado' : b.status === 'active' || b.status === 'prepaid' || b.status === 'lifetime' ? 'mascote-festa' : 'mascote-moeda'
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
-      <Panel className="flex flex-wrap items-center gap-x-5 gap-y-3 p-5 sm:p-6">
+    <div className="mx-auto max-w-5xl space-y-3 sm:space-y-4">
+      <Panel className="flex flex-wrap items-center gap-x-5 gap-y-3 p-4 sm:p-6">
         <Emoji name={pose} size={88} className="mascot" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -66,8 +66,8 @@ function Plans({ b }: { b: Billing }) {
   const is = (c: PayChoice) => busy === `${c.period}-${c.method}`
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-      <Panel className="p-5 sm:p-7">
+    <div className="grid gap-3 sm:gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+      <Panel className="p-4 sm:p-7">
         {/* mensal ou anual */}
         <div role="radiogroup" aria-label="Período do plano" className="grid grid-cols-2 gap-2 rounded-2xl bg-sunken p-1.5">
           {(
@@ -133,7 +133,7 @@ function Plans({ b }: { b: Billing }) {
       </Panel>
 
       {/* como pagar */}
-      <Panel className="flex flex-col p-5 sm:p-7">
+      <Panel className="flex flex-col p-4 sm:p-7">
         <h3 className="text-lead font-semibold">Como você quer pagar?</h3>
         <div className="mt-4 space-y-3">
           {yearly ? (
@@ -228,7 +228,7 @@ function ManageCard({ b }: { b: Billing }) {
   const { run } = useStore()
   const [confirming, setConfirming] = useState(false)
   return (
-    <Panel className="p-5 sm:p-7">
+    <Panel className="p-4 sm:p-7">
       <h3 className="text-lead font-semibold">Plano mensal no cartão</h3>
       <p className="mt-1 text-muted">
         {brl(b.price_cents)} por mês, cobrados no seu cartão. Cancelando, o acesso continua até o fim do período já pago

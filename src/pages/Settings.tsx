@@ -29,7 +29,7 @@ export function Settings() {
   }
 
   return (
-    <div className="grid max-w-4xl gap-4 md:grid-cols-2">
+    <div className="grid max-w-4xl gap-3 sm:gap-4 md:grid-cols-2">
       {/* no celular o menu de baixo não tem "Minha renda": o atalho fica aqui, em destaque */}
       <Link
         href="/renda"
@@ -42,7 +42,7 @@ export function Settings() {
         </span>
         <ChevronRight size={18} className="text-faint" />
       </Link>
-      <Panel className="space-y-4 p-5 sm:p-6">
+      <Panel className="space-y-4 p-4 sm:p-6">
         <h2 className="text-lead font-semibold">Perfil</h2>
         <form
           className="space-y-4"
@@ -87,8 +87,8 @@ export function Settings() {
         </div>
       </Panel>
 
-      <div className="space-y-4">
-        <Panel className="p-5 sm:p-6">
+      <div className="space-y-3 sm:space-y-4">
+        <Panel className="p-4 sm:p-6">
           <h2 className="text-lead font-semibold">Trocar senha</h2>
           <form
             className="mt-4 space-y-4"
@@ -111,7 +111,7 @@ export function Settings() {
 
         <PlanPanel />
 
-        <Panel className="p-5 sm:p-6">
+        <Panel className="p-4 sm:p-6">
           <h2 className="text-lead font-semibold">Configuração inicial</h2>
           <p className="mt-1 text-caption text-muted">
             O passo a passo de renda, contas, cartões e dia a dia. Nada do que já está cadastrado é apagado.
@@ -121,7 +121,7 @@ export function Settings() {
           </Button>
         </Panel>
 
-        <Panel className="p-5 sm:p-6">
+        <Panel className="p-4 sm:p-6">
           <h2 className="text-lead font-semibold">Seus dados</h2>
           <p className="mt-1 text-caption text-muted">Baixe uma cópia de tudo que está cadastrado, em JSON.</p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -159,7 +159,7 @@ function PlanPanel() {
   const b = state.user.billing
   const tone = b.status === 'expired' ? 'bad' : b.status === 'trial' || b.status === 'cancelled' ? 'warn' : 'good'
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lead font-semibold">Assinatura</h2>
         <Badge tone={tone}>{planLabel(b)}</Badge>
@@ -201,7 +201,7 @@ function DeleteAccountPanel() {
   }
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <h2 className="text-lead font-semibold">Excluir conta</h2>
       <p className="mt-1 text-caption text-muted">
         Apaga de vez sua conta e tudo que está cadastrado nela, e cancela a assinatura se houver. Não dá pra desfazer; baixe um

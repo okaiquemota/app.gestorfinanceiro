@@ -27,13 +27,13 @@ export function Dashboard() {
 
   return (
     // Em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
-    <div className="space-y-4 fit:flex fit:h-[calc(var(--app-vh)-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0">
-      <div className="flex flex-col gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
+    <div className="space-y-3 sm:space-y-4 fit:flex fit:h-[calc(var(--app-vh)-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0">
+      <div className="flex flex-col gap-3 sm:gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
         <div className="contents min-w-0 flex-1 xl:flex xl:flex-col xl:gap-4">
           <div className="order-1 xl:order-none fit:shrink-0">
             <BalanceCard sum={sum} list={pay} allPaid={pay.length > 0 && pay.every((p) => p.paid)} />
           </div>
-          <div className={cx('order-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
+          <div className={cx('order-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
             <BreakdownCard sum={sum} />
             <CardsCard />
           </div>
@@ -90,7 +90,7 @@ function BalanceCard({ sum, allPaid, list }: { sum: Summary; allPaid: boolean; l
   const scale = Math.max(sum.income, sum.expenses)
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-lead font-semibold">Saldo previsto</h2>
@@ -211,7 +211,7 @@ function PayablesCard({ list }: { list: Payable[] }) {
   const head = payablesHeadline(list)
 
   return (
-    <Panel className={cx('flex flex-col p-5 sm:p-6 tight:p-5', SCROLL)}>
+    <Panel className={cx('flex flex-col p-4 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader
         title="Contas a pagar"
         emoji="calendar-spiral"
@@ -330,7 +330,7 @@ function BreakdownCard({ sum }: { sum: Summary }) {
   }, [sum.byCategory, limit])
   const max = Math.max(0, ...rows.map((r) => r.amount))
   return (
-    <Panel className={cx('p-5 sm:p-6 tight:p-5', SCROLL)}>
+    <Panel className={cx('p-4 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader title="Para onde vai" emoji="chart-bar">
         <p className="mt-3 text-caption text-muted">Total das saídas</p>
         <div className="mt-1">
@@ -402,7 +402,7 @@ function CardsCard() {
   const y = (amount: number) => 90 - (amount / max) * 80
 
   return (
-    <Panel className={cx('flex flex-col p-5 sm:p-6 tight:p-5', SCROLL)}>
+    <Panel className={cx('flex flex-col p-4 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader title="Cartões" emoji="card">
         <p className="mt-3 text-caption text-muted">
           Fatura de {monthLower(month)}
@@ -538,7 +538,7 @@ function HousingCard({ sum }: { sum: Summary }) {
   const ok = ratio <= HOUSING_REF
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <PanelHeader title="Moradia" emoji="house">
         <p className="mt-3 text-caption text-muted">Quanto você gasta pra morar</p>
         <div className="mt-1">
@@ -666,7 +666,7 @@ function ReserveStrip({ compact }: { compact?: boolean }) {
     )
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PanelHeader title="Reserva">
           <div className="mt-2">

@@ -204,7 +204,7 @@ const sessionUser = async (c: Ctx): Promise<string | null> => {
 }
 
 const WINDOW_MS = 15 * 60_000
-const TOO_MANY = 'Muitas tentativas. Espere alguns minutos e tente de novo.'
+const TOO_MANY = 'Muitas tentativas seguidas. Por segurança, bloqueamos por 15 minutos. Tente de novo depois.'
 
 /**
  * Freia tentativas repetidas. Cada chave tem seu teto na janela de 15 minutos:

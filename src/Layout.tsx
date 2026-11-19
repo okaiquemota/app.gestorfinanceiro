@@ -468,7 +468,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <Sidebar path={path} />
       <div className="min-w-0 flex-1 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-4">
         <TopBar page={page} />
-        <main id="conteudo" ref={main} tabIndex={-1} className="pt-4 outline-none lg:pt-5">
+        <main id="conteudo" ref={main} tabIndex={-1} className="pt-3 outline-none sm:pt-4 lg:pt-5">
           {/* a chave refaz o bloco a cada tela, o que dispara a entrada dos painéis */}
           <div key={path} className="page-in">
             {children}

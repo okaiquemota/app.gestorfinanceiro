@@ -12,6 +12,8 @@ const MONEY_SIZES = {
   // cresce com a tela, mas nunca estoura um celular de 320px
   hero: { int: 'text-[clamp(2.25rem,10.5vw,3.25rem)] leading-none tracking-[-0.035em]', small: 'text-lg sm:text-xl' },
   xl: { int: 'text-[30px] sm:text-[34px] leading-none tracking-[-0.03em]', small: 'text-sm' },
+  // resumo que divide a linha com outro no celular: menor lá, igual ao xl a partir do tablet
+  stat: { int: 'text-[22px] sm:text-[34px] leading-none tracking-[-0.03em]', small: 'text-xs sm:text-sm' },
   lg: { int: 'text-2xl leading-none tracking-[-0.02em]', small: 'text-xs' },
 }
 

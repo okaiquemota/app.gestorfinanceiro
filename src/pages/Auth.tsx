@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { api } from '../lib/api.ts'
+import { ApiError, api } from '../lib/api.ts'
 import { Link, navigate } from '../router.tsx'
 import { PublicShell } from './Public.tsx'
 import { Emoji, Field, PasswordInput, TextInput } from '../ui.tsx'
@@ -25,6 +25,8 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
   const [password, setPassword] = useState('')
   const [accept, setAccept] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Código HTTP do último erro: decide quais atalhos aparecem junto da mensagem. */
+  const [errorStatus, setErrorStatus] = useState(0)
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   // O token do link de nova senha sai da barra de endereço assim que a tela abre:
@@ -40,6 +42,7 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
     if (mode === 'signup' && !accept) return setError('Para criar a conta é preciso aceitar os termos e a política de privacidade.')
     setBusy(true)
     setError(null)
+    setErrorStatus(0)
     try {
       if (mode === 'login') await api('POST', '/auth/login', { email, password })
       else if (mode === 'signup') await api('POST', '/auth/signup', { name, email, password, accept_terms: true })
@@ -55,6 +58,7 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
       onDone()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Algo deu errado.')
+      setErrorStatus(e instanceof ApiError ? e.status : 0)
       setBusy(false)
     }
   }
@@ -178,6 +182,25 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
             {error && (
               <p role="alert" className="rounded-xl bg-bad-soft px-3 py-2 text-sm font-semibold text-bad">
                 {error}
+                {/* e-mail já cadastrado: leva direto pra entrar ou recuperar a senha */}
+                {mode === 'signup' && errorStatus === 409 && (
+                  <span className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
+                    <Link href="/entrar" className="underline underline-offset-2">
+                      Entrar com este e-mail
+                    </Link>
+                    <Link href="/recuperar-senha" className="underline underline-offset-2">
+                      Esqueci a senha
+                    </Link>
+                  </span>
+                )}
+                {mode === 'login' && (errorStatus === 401 || errorStatus === 429) && (
+                  <>
+                    {' '}
+                    <Link href="/recuperar-senha" className="underline underline-offset-2">
+                      Esqueci a senha
+                    </Link>
+                  </>
+                )}
                 {mode === 'reset' && /expirou/.test(error) && (
                   <>
                     {' '}
