@@ -1,6 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { ButtonHTMLAttributes, InputHTMLAttributes, KeyboardEvent, ReactNode, SelectHTMLAttributes } from 'react'
-import { Check, CircleAlert, X } from 'lucide-react'
+import { Check, CircleAlert, Eye, EyeOff, X } from 'lucide-react'
 import { monthNames, monthParts, splitBRL } from './lib/format.ts'
 
 export const cx = (...parts: (string | false | null | undefined)[]): string =>
@@ -12,7 +12,39 @@ const MONEY_SIZES = {
   // cresce com a tela, mas nunca estoura um celular de 320px
   hero: { int: 'text-[clamp(2.25rem,10.5vw,3.25rem)] leading-none tracking-[-0.035em]', small: 'text-lg sm:text-xl' },
   xl: { int: 'text-[30px] sm:text-[34px] leading-none tracking-[-0.03em]', small: 'text-sm' },
+  // resumo que divide a linha com outro no celular: menor lá, igual ao xl a partir do tablet
+  stat: { int: 'text-[22px] sm:text-[34px] leading-none tracking-[-0.03em]', small: 'text-xs sm:text-sm' },
   lg: { int: 'text-2xl leading-none tracking-[-0.02em]', small: 'text-xs' },
+}
+
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** Anima um valor em centavos do que estava na tela até o novo, em ~0,5s. */
+function useCountUp(target: number): number {
+  const [shown, setShown] = useState(target)
+  const from = useRef(target)
+  useEffect(() => {
+    const start = from.current
+    if (start === target) return
+    if (reducedMotion()) {
+      from.current = target
+      setShown(target)
+      return
+    }
+    const t0 = performance.now()
+    let raf = 0
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - t0) / 500)
+      const eased = 1 - (1 - p) ** 3
+      const value = Math.round(start + (target - start) * eased)
+      from.current = value
+      setShown(value)
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target])
+  return shown
 }
 
 /** Valor em destaque: "R$" apagado, inteiro forte, centavos pequenos. */
@@ -27,7 +59,8 @@ export function Money({
   approx?: boolean
   className?: string
 }) {
-  const { neg, int, dec } = splitBRL(cents)
+  // o número "corre" até o valor novo quando ele muda (troca de mês, conta paga…)
+  const { neg, int, dec } = splitBRL(useCountUp(cents))
   const s = MONEY_SIZES[size]
   return (
     <span className={cx('tnum inline-flex items-baseline whitespace-nowrap font-semibold', className)}>
@@ -62,11 +95,22 @@ export function Panel({ className, children }: { className?: string; children: R
   )
 }
 
-export function Emoji({ name, size = 48, className }: { name: string; size?: number; className?: string }) {
+export function Emoji({
+  name,
+  size = 48,
+  className,
+  alt = '',
+}: {
+  name: string
+  size?: number
+  className?: string
+  /** Só quando a imagem diz algo que o texto ao redor não diz. */
+  alt?: string
+}) {
   return (
     <img
       src={`/emoji/${name}.webp`}
-      alt=""
+      alt={alt}
       width={size}
       height={size}
       loading="lazy"
@@ -90,7 +134,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
-      <Emoji name={emoji} size={64} />
+      <Emoji name={emoji} size={emoji.startsWith('mascote') ? 96 : 64} className={emoji.startsWith('mascote') ? 'mascot' : undefined} />
       <h3 className="mt-3 text-base font-semibold">{title}</h3>
       {children && <p className="mt-1 max-w-sm text-muted">{children}</p>}
       {action && <div className="mt-4">{action}</div>}
@@ -162,6 +206,8 @@ export function CheckCircle({
   onChange: (v: boolean) => void
   label: string
 }) {
+  // o "pop" só acontece quando a pessoa marca, não quando a lista aparece já marcada
+  const [justChanged, setJustChanged] = useState(false)
   return (
     <button
       type="button"
@@ -171,6 +217,7 @@ export function CheckCircle({
       title={label}
       onClick={(e) => {
         e.stopPropagation()
+        setJustChanged(true)
         onChange(!checked)
       }}
       // área de toque maior que o círculo
@@ -179,6 +226,7 @@ export function CheckCircle({
       <span
         className={cx(
           'flex size-[22px] items-center justify-center rounded-full border-[1.5px] transition-[background-color,border-color,transform] duration-150 group-active:scale-90',
+          checked && justChanged && 'check-pop',
           checked
             ? 'border-good-fill bg-good-fill text-white'
             : 'border-control text-transparent group-hover:border-accent',
@@ -296,6 +344,26 @@ export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cx(INPUT, props.className)} />
 }
 
+/** Campo de senha com botão de mostrar/esconder (ajuda muito no celular). */
+export function PasswordInput(props: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const [shown, setShown] = useState(false)
+  return (
+    <span className="relative block">
+      <input {...props} type={shown ? 'text' : 'password'} className={cx(INPUT, 'pr-12', props.className)} />
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        aria-label={shown ? 'Esconder senha' : 'Mostrar senha'}
+        aria-pressed={shown}
+        title={shown ? 'Esconder senha' : 'Mostrar senha'}
+        className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-xl text-faint hover:text-fg"
+      >
+        {shown ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
+    </span>
+  )
+}
+
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={cx(INPUT, 'field', props.className)} />
 }
@@ -350,7 +418,8 @@ export function MoneyInput({
         aria-label={ariaLabel}
         value={value}
         onChange={(e) => {
-          const digits = e.target.value.replace(/\D/g, '').slice(0, 12)
+          // até R$ 999.999.999,99: o teto que o servidor aceita
+          const digits = e.target.value.replace(/\D/g, '').slice(0, 11)
           onChange(digits ? parseInt(digits, 10) : 0)
         }}
         onFocus={caretToEnd}

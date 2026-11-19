@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   ArrowLeftRight,
+  BadgeCheck,
   Banknote,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Flame,
   LayoutGrid,
   Moon,
   PiggyBank,
@@ -16,8 +18,12 @@ import {
   Sun,
 } from 'lucide-react'
 import { addMonths } from '../shared/finance.ts'
+import type { Billing } from '../shared/types.ts'
 import { currentMonth, monthNames, monthParts, monthTitle } from './lib/format.ts'
-import { Link, usePath } from './router.tsx'
+import { achievements, newlyUnlocked, streak } from './lib/fun.ts'
+import { planLabel } from './Paywall.tsx'
+import { api } from './lib/api.ts'
+import { Link, navigate, usePath } from './router.tsx'
 import { useStore } from './store.tsx'
 import type { FormSpec } from './store.tsx'
 import { Emoji, IconButton, Toast, cx } from './ui.tsx'
@@ -31,6 +37,7 @@ const NAV = [
 ]
 const SETTINGS_NAV = [
   { href: '/renda', label: 'Minha renda', icon: Banknote },
+  { href: '/assinatura', label: 'Assinatura', icon: BadgeCheck },
   { href: '/ajustes', label: 'Ajustes', icon: Settings },
 ]
 
@@ -88,14 +95,23 @@ function ThemeSwitch() {
   )
 }
 
+/** Texto do lembrete do plano no menu, ou null quando não há o que lembrar. */
+const billingNudge = (b: Billing): string | null => {
+  if (!b.enabled) return null
+  if (b.status === 'trial' || b.status === 'expired') return planLabel(b)
+  if ((b.status === 'prepaid' || b.status === 'cancelled') && b.paid_days_left <= 5)
+    return b.paid_days_left === 1 ? 'Seu acesso vence amanhã' : `Seu acesso vence em ${b.paid_days_left} dias`
+  return null
+}
+
 function Sidebar({ path }: { path: string }) {
   const { state } = useStore()
   return (
-    <aside className="sticky top-4 hidden h-[calc(100dvh-32px)] w-[232px] shrink-0 flex-col rounded-panel border border-line bg-surface p-3 shadow-card lg:flex">
+    <aside className="sticky top-4 hidden h-[calc(var(--app-vh)-32px)] w-[232px] shrink-0 flex-col rounded-panel border border-line bg-surface p-3 shadow-card lg:flex">
       <Link href="/" className="flex items-center gap-2.5 px-2 pb-4 pt-2">
-        <Emoji name="money-bag" size={34} />
+        <Emoji name="mascote" size={40} />
         <span>
-          <span className="block text-lead font-semibold leading-tight">Gestor</span>
+          <span className="block text-lead font-semibold leading-tight">Poupin</span>
           <span className="block text-xs text-muted">Minhas finanças</span>
         </span>
       </Link>
@@ -115,6 +131,20 @@ function Sidebar({ path }: { path: string }) {
       </nav>
 
       <div className="mt-auto">
+        {/* lembrete discreto do plano, com o caminho pra pagar: teste correndo,
+            acesso vencido, ou mês a mês/cancelado chegando ao fim */}
+        {billingNudge(state.user.billing) && (
+          <Link
+            href="/assinatura"
+            className={cx(
+              'mx-1 mb-1 block rounded-xl px-3 py-2 text-caption font-semibold',
+              state.user.billing.status === 'expired' ? 'bg-bad-soft text-bad' : 'bg-primary-soft text-accent',
+            )}
+          >
+            {billingNudge(state.user.billing)}
+            <span className="block font-normal text-muted">Ver assinatura</span>
+          </Link>
+        )}
         <div className="flex items-center justify-between px-3 py-3">
           <span className="flex items-center gap-3 text-sm text-muted">
             <Sun size={16} /> Tema
@@ -198,7 +228,7 @@ function AddMenu() {
         <ChevronDown size={16} className={cx('transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <ul className="absolute right-0 top-12 z-30 w-60 rounded-2xl border border-line bg-surface p-1.5 shadow-pop">
+        <ul className="pop-in absolute right-0 top-12 z-30 w-60 rounded-2xl border border-line bg-surface p-1.5 shadow-pop">
           {items.map((i) => (
             <li key={i.label}>
               <button
@@ -253,7 +283,7 @@ function MonthPicker() {
         <ChevronDown size={16} className={cx('shrink-0 text-faint transition-transform', open && 'rotate-180')} />
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-30 mt-2 w-[272px] rounded-2xl border border-line bg-surface p-3 shadow-pop">
+        <div className="pop-in absolute left-0 top-full z-30 mt-2 w-[272px] rounded-2xl border border-line bg-surface p-3 shadow-pop">
           <div className="flex items-center justify-between">
             <IconButton label="Ano anterior" onClick={() => setViewYear((y) => y - 1)}>
               <ChevronLeft size={18} />
@@ -304,6 +334,24 @@ function MonthPicker() {
   )
 }
 
+/** Meses seguidos fechando no azul. Só aparece quando há sequência pra mostrar. */
+function StreakChip() {
+  const { state } = useStore()
+  const n = useMemo(() => streak(state), [state])
+  if (n < 1) return null
+  return (
+    <Link
+      href="/reserva"
+      title="Meses seguidos fechando no azul. Ver conquistas"
+      className="flex h-10 items-center gap-1.5 rounded-xl bg-good-soft px-3 text-caption font-semibold text-good max-md:hidden"
+    >
+      <Flame size={15} />
+      <span className="tnum">{n}</span>
+      <span className="max-xl:sr-only">{n === 1 ? 'mês no azul' : 'meses no azul'}</span>
+    </Link>
+  )
+}
+
 function TopBar({ page }: { page: string }) {
   const { month, setMonth, state } = useStore()
   return (
@@ -321,6 +369,7 @@ function TopBar({ page }: { page: string }) {
       </h1>
       <MonthPicker />
       <div className="ml-auto flex shrink-0 items-center gap-2 pl-1">
+        <StreakChip />
         <AddMenu />
         <Link
           href="/ajustes"
@@ -364,13 +413,45 @@ const PAGE_NAMES: Record<string, string> = Object.fromEntries(
 
 export function Layout({ children }: { children: ReactNode }) {
   const path = usePath()
-  const { toast, dismissToast } = useStore()
+  const { toast, dismissToast, state, celebrate, celebration, notify } = useStore()
+
+  // Voltando da página de pagamento (em qualquer tela): confere o pagamento sem
+  // esperar o aviso automático, e leva a pessoa pra tela de assinatura.
+  const { reload } = useStore()
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    if (!q.has('pagamento')) return
+    window.history.replaceState(null, '', '/assinatura')
+    navigate('/assinatura')
+    api('POST', '/billing/sync', { session_id: q.get('session_id') ?? undefined })
+      .then(reload)
+      .then(() => api<{ user: { billing: { status: string } } }>('GET', '/state'))
+      .then((s) => {
+        const st = s.user.billing.status
+        if (st === 'active' || st === 'prepaid') notify('Tudo certo! Seu plano está ativo.', 'success')
+        else notify('Pedido recebido. Assim que o pagamento for confirmado, seu acesso é liberado sozinho.', 'success')
+      })
+      .catch(() => {})
+  }, [reload, notify])
+
+  // Conquista nova desde a última visita neste aparelho: comemora. Se já tem uma
+  // festa na tela (ex.: acabou de pagar a última conta), vira só um aviso.
+  const unlocked = useMemo(() => achievements(state), [state])
+  const partying = useRef(false)
+  partying.current = celebration !== null
+  useEffect(() => {
+    const fresh = newlyUnlocked(state.user.id, unlocked)
+    if (fresh.length === 0) return
+    const title = fresh[fresh.length - 1].title
+    if (partying.current) notify(`Conquista desbloqueada: ${title}`, 'success')
+    else celebrate(`Conquista: ${title}!`)
+  }, [unlocked, celebrate, notify, state.user.id])
   const page = PAGE_NAMES[path] ?? 'Visão geral'
   const main = useRef<HTMLElement>(null)
   const shownPath = useRef(path)
 
   useEffect(() => {
-    document.title = `${page} · Gestor financeiro`
+    document.title = `${page} · Poupin`
     // ao trocar de tela (não na primeira carga), o foco vai pro conteúdo:
     // teclado e leitor de tela não ficam presos no menu
     if (shownPath.current !== path) {
@@ -387,8 +468,11 @@ export function Layout({ children }: { children: ReactNode }) {
       <Sidebar path={path} />
       <div className="min-w-0 flex-1 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-4">
         <TopBar page={page} />
-        <main id="conteudo" ref={main} tabIndex={-1} className="pt-4 outline-none lg:pt-5">
-          {children}
+        <main id="conteudo" ref={main} tabIndex={-1} className="pt-3 outline-none sm:pt-4 lg:pt-5">
+          {/* a chave refaz o bloco a cada tela, o que dispara a entrada dos painéis */}
+          <div key={path} className="page-in">
+            {children}
+          </div>
         </main>
       </div>
       <BottomNav path={path} />

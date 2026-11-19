@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownRight, ArrowUpRight, Check, ChevronRight, Pencil, TriangleAlert } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { ArrowDownRight, ArrowUpRight, Check, ChevronLeft, ChevronRight, Pencil, TriangleAlert } from 'lucide-react'
 import {
   HOUSING,
   addMonths,
@@ -13,38 +13,33 @@ import {
 import type { Payable, Summary } from '../../shared/finance.ts'
 import { CardVisual, Meter, PanelHeader, PayableRow, daysUntil, dueStatus } from '../components.tsx'
 import { category } from '../lib/categories.ts'
-import { brl, brlRound, dd, monthLower, monthShort, pct } from '../lib/format.ts'
+import { brl, dd, monthLower, monthShort, pct } from '../lib/format.ts'
+import { poupinSays } from '../lib/fun.ts'
+import { useLayoutMode } from '../lib/scale.ts'
 import { Link } from '../router.tsx'
 import { useStore } from '../store.tsx'
-import { Amount, Button, Emoji, Money, Panel, Segmented, cx } from '../ui.tsx'
+import { Amount, Badge, Button, Emoji, Money, Panel, Segmented, cx } from '../ui.tsx'
 
 export function Dashboard() {
   const { state, month } = useStore()
   const sum = useMemo(() => summarize(state, month), [state, month])
   const pay = useMemo(() => payables(state, month), [state, month])
-  const hasIncome = state.entries.some((e) => e.kind === 'income')
-  const hasBills = state.entries.some((e) => e.kind === 'expense')
-  const onboarding = !hasIncome || !hasBills
 
   return (
-    // Com os primeiros passos na tela a página rola normalmente; depois disso,
-    // em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
-    <div className={cx('space-y-4', !onboarding && 'fit:flex fit:h-[calc(100dvh-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0')}>
-      {onboarding && <Onboarding hasIncome={hasIncome} hasBills={hasBills} />}
-      <div className="flex flex-col gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
+    // Em telas "fit" tudo cabe na janela (margens + barra do mês + respiros = 8.625rem).
+    <div className="space-y-3 sm:space-y-4 fit:flex fit:h-[calc(var(--app-vh)-8.625rem)] fit:flex-col fit:gap-4 fit:space-y-0">
+      <div className="flex flex-col gap-3 sm:gap-4 xl:flex-row fit:min-h-0 fit:flex-1">
         <div className="contents min-w-0 flex-1 xl:flex xl:flex-col xl:gap-4">
           <div className="order-1 xl:order-none fit:shrink-0">
-            <BalanceCard sum={sum} />
+            <BalanceCard sum={sum} list={pay} allPaid={pay.length > 0 && pay.every((p) => p.paid)} />
           </div>
-          <div className={cx('order-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
+          <div className={cx('order-3 grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:order-none', FILL, 'fit:grid-rows-[minmax(0,1fr)]')}>
             <BreakdownCard sum={sum} />
-            <CardsCard sum={sum} />
+            <CardsCard />
           </div>
-          {!onboarding && (
-            <div className="hidden shrink-0 fit:block">
-              <ReserveStrip compact />
-            </div>
-          )}
+          <div className="hidden shrink-0 fit:block">
+            <ReserveStrip compact />
+          </div>
         </div>
         <div className="contents xl:flex xl:w-[392px] xl:shrink-0 xl:flex-col xl:gap-4">
           <div className={cx('order-2 xl:order-none', FILL)}>
@@ -55,7 +50,7 @@ export function Dashboard() {
           </div>
         </div>
       </div>
-      <div className={cx(!onboarding && 'fit:hidden')}>
+      <div className="fit:hidden">
         <ReserveStrip />
       </div>
     </div>
@@ -67,78 +62,22 @@ const FILL = 'fit:min-h-0 fit:flex-1'
 /** No modo "fit": cartão do tamanho do espaço, rolando por dentro se precisar. */
 const SCROLL = 'scroll-thin fit:h-full fit:overflow-y-auto'
 
-// ---------- primeiros passos ----------
-
-function Onboarding({ hasIncome, hasBills }: { hasIncome: boolean; hasBills: boolean }) {
-  const { state, openForm } = useStore()
-  const steps = [
-    {
-      done: hasIncome,
-      emoji: 'banknote',
-      title: 'Cadastre sua renda',
-      text: 'Salário e o que mais entra todo mês.',
-      go: () => openForm({ type: 'entry', kind: 'income', preset: { name: 'Salário' } }),
-    },
-    {
-      done: hasBills,
-      emoji: 'receipt',
-      title: 'Adicione suas contas',
-      text: 'Aluguel, luz, internet, parcelas… uma por uma.',
-      go: () => openForm({ type: 'entry', kind: 'expense' }),
-    },
-    {
-      done: state.cards.length > 0,
-      emoji: 'card',
-      title: 'Cadastre seus cartões',
-      text: 'Pra fatura entrar na conta do mês.',
-      go: () => openForm({ type: 'card' }),
-    },
-  ]
-  return (
-    <Panel className="p-5 sm:p-6">
-      <div className="flex items-center gap-3">
-        <Emoji name="wave" size={40} />
-        <div>
-          <h2 className="text-lg font-semibold tracking-[-0.01em]">Vamos organizar isso, {state.user.name.split(' ')[0]}</h2>
-          <p className="text-muted">Três passos e você já enxerga quanto sobra no mês.</p>
-        </div>
-      </div>
-      <ol className="mt-4 grid gap-3 md:grid-cols-3">
-        {steps.map((s, i) => (
-          <li key={s.title}>
-            <button
-              type="button"
-              onClick={s.go}
-              className={cx(
-                'flex h-full w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition-colors',
-                s.done ? 'border-line bg-sunken' : 'border-line-strong hover:border-primary hover:bg-primary-soft',
-              )}
-            >
-              <Emoji name={s.emoji} size={36} className={s.done ? 'opacity-60' : undefined} />
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold">
-                  {i + 1}. {s.title}
-                </span>
-                <span className="block text-caption text-muted">{s.text}</span>
-              </span>
-              {s.done ? (
-                <span className="flex size-6 items-center justify-center rounded-full bg-good-fill text-white">
-                  <Check size={14} strokeWidth={3} />
-                </span>
-              ) : (
-                <ChevronRight size={18} className="text-faint" />
-              )}
-            </button>
-          </li>
-        ))}
-      </ol>
-    </Panel>
-  )
-}
-
 // ---------- saldo previsto ----------
 
-function BalanceCard({ sum }: { sum: Summary }) {
+/** O mascote reage ao mês, em vez de repetir o logo do menu. */
+const mascotFor = (sum: Summary, allPaid: boolean): { pose: string; alt: string } =>
+  sum.income === 0 && sum.expenses === 0
+    ? { pose: 'mascote-dormindo', alt: 'Poupin dormindo: ainda não há nada cadastrado neste mês' }
+    : sum.leftover < 0
+      ? { pose: 'mascote-preocupado', alt: 'Poupin preocupado: as saídas passam da renda' }
+      : allPaid
+        ? { pose: 'mascote-festa', alt: 'Poupin comemorando: todas as contas do mês estão pagas' }
+        : { pose: 'mascote-moeda', alt: 'Poupin abraçando uma moeda: está sobrando dinheiro no mês' }
+
+function BalanceCard({ sum, allPaid, list }: { sum: Summary; allPaid: boolean; list: Payable[] }) {
+  const { state, month } = useStore()
+  const mascot = mascotFor(sum, allPaid)
+  const says = useMemo(() => poupinSays(state, month, sum, list), [state, month, sum, list])
   const segs = [
     { label: 'Moradia', value: sum.housing, color: 'var(--s-housing)' },
     { label: 'Outras contas', value: sum.bills, color: 'var(--s-bills)' },
@@ -151,7 +90,7 @@ function BalanceCard({ sum }: { sum: Summary }) {
   const scale = Math.max(sum.income, sum.expenses)
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-lead font-semibold">Saldo previsto</h2>
@@ -171,24 +110,27 @@ function BalanceCard({ sum }: { sum: Summary }) {
                   As saídas passam da renda
                 </p>
               )}
-              <p className="text-caption text-muted">valor estimado após pagar todas as contas</p>
+              {/* a fala do Poupin sobre o mês, num balão apontando pra ele */}
+              <p className="relative mt-1.5 inline-block max-w-[19rem] rounded-2xl rounded-bl-md bg-primary-soft px-3 py-1.5 text-caption font-medium leading-snug">
+                {says}
+              </p>
             </div>
           </div>
         </div>
-        <Emoji name="wallet" size={104} className="hidden drop-shadow-[0_14px_16px_rgb(0_0_0/0.16)] sm:block" />
+        <Emoji name={mascot.pose} alt={mascot.alt} size={104} className="mascot hidden drop-shadow-[0_14px_16px_rgb(0_0_0/0.16)] sm:block" />
       </div>
 
       <div
         role="img"
         aria-label={`Renda de ${brl(sum.income)}: ${segs.map((s) => `${s.label} ${brl(s.value)}`).join(', ')}, sobra ${brl(sum.leftover)}`}
-        className="mt-5 flex h-2.5 gap-[2px] overflow-hidden rounded-full sm:mt-6"
+        className="bar-x mt-5 flex h-2.5 gap-[2px] overflow-hidden rounded-full sm:mt-6"
       >
         {scale === 0 && <span className="flex-1 bg-sunken" />}
         {segs.map((s) => (
-          <span key={s.label} title={`${s.label}: ${brl(s.value)}`} style={{ flexGrow: s.value, background: s.color }} className="min-w-[3px] rounded-[2px]" />
+          <span key={s.label} title={`${s.label}: ${brl(s.value)}`} style={{ flexGrow: s.value, background: s.color }} className="bar-seg min-w-[3px] rounded-[2px]" />
         ))}
         {sum.leftover > 0 && (
-          <span title={`Sobra: ${brl(sum.leftover)}`} style={{ flexGrow: sum.leftover, background: 'var(--s-left)' }} className="min-w-[3px] rounded-[2px]" />
+          <span title={`Sobra: ${brl(sum.leftover)}`} style={{ flexGrow: sum.leftover, background: 'var(--s-left)' }} className="bar-seg min-w-[3px] rounded-[2px]" />
         )}
       </div>
 
@@ -269,7 +211,7 @@ function PayablesCard({ list }: { list: Payable[] }) {
   const head = payablesHeadline(list)
 
   return (
-    <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
+    <Panel className={cx('flex flex-col p-4 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader
         title="Contas a pagar"
         emoji="calendar-spiral"
@@ -377,22 +319,8 @@ function PayablesCard({ list }: { list: Payable[] }) {
 // ---------- para onde vai ----------
 
 const MAX_CATEGORIES = 7
-/** Em janelas baixas (variante "tight" do CSS) cabem menos linhas sem rolar o cartão. */
-const TIGHT = '(min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem)'
-const useMedia = (query: string): boolean => {
-  const [on, setOn] = useState(() => window.matchMedia(query).matches)
-  useEffect(() => {
-    const mq = window.matchMedia(query)
-    const update = () => setOn(mq.matches)
-    update()
-    mq.addEventListener('change', update)
-    return () => mq.removeEventListener('change', update)
-  }, [query])
-  return on
-}
-
 function BreakdownCard({ sum }: { sum: Summary }) {
-  const limit = useMedia(TIGHT) ? 5 : MAX_CATEGORIES
+  const limit = useLayoutMode() === 'tight' ? 4 : MAX_CATEGORIES
   // As maiores aparecem; o resto vira uma linha só — o cartão não cresce sem limite.
   const rows = useMemo(() => {
     if (sum.byCategory.length <= limit) return sum.byCategory
@@ -402,7 +330,7 @@ function BreakdownCard({ sum }: { sum: Summary }) {
   }, [sum.byCategory, limit])
   const max = Math.max(0, ...rows.map((r) => r.amount))
   return (
-    <Panel className={cx('p-5 sm:p-6', SCROLL)}>
+    <Panel className={cx('p-4 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader title="Para onde vai" emoji="chart-bar">
         <p className="mt-3 text-caption text-muted">Total das saídas</p>
         <div className="mt-1">
@@ -444,31 +372,48 @@ function BreakdownCard({ sum }: { sum: Summary }) {
 
 // ---------- cartões ----------
 
-function CardsCard({ sum }: { sum: Summary }) {
+function CardsCard() {
   const { state, month, openForm } = useStore()
   const invoices = useMemo(() => state.cards.map((c) => invoiceFor(state, c, month)), [state, month])
+
+  // Carrossel: um cartão em foco por vez, com o próximo aparecendo na borda.
+  const [pickedId, setPickedId] = useState<string | null>(null)
+  const index = Math.max(0, invoices.findIndex((i) => i.card.id === pickedId))
+  const current = invoices[index]
+  const strip = useRef<HTMLDivElement>(null)
+  const go = (i: number) => {
+    const next = invoices[i]
+    if (!next) return
+    setPickedId(next.card.id)
+    const el = strip.current?.children[i] as HTMLElement | undefined
+    // rola só a fileira (scrollIntoView mexeria também na página)
+    if (el && strip.current) strip.current.scrollTo({ left: el.offsetLeft - strip.current.offsetLeft, behavior: 'smooth' })
+  }
+
   const upcoming = useMemo(
     () =>
-      [0, 1, 2].map((i) => {
-        const m = addMonths(month, i)
-        return { month: m, total: state.cards.reduce((s, c) => s + invoiceFor(state, c, m).amount, 0) }
-      }),
-    [state, month],
+      current
+        ? [0, 1, 2].map((i) => invoiceFor(state, current.card, addMonths(month, i)))
+        : [],
+    [state, month, current],
   )
-  const max = Math.max(1, ...upcoming.map((u) => u.total))
+  const max = Math.max(1, ...upcoming.map((u) => u.amount))
+  // altura do ponto de cada mês dentro da faixa do gráfico (10% a 90%)
+  const y = (amount: number) => 90 - (amount / max) * 80
 
   return (
-    <Panel className={cx('flex flex-col p-5 sm:p-6', SCROLL)}>
+    <Panel className={cx('flex flex-col p-4 sm:p-6 tight:p-5', SCROLL)}>
       <PanelHeader title="Cartões" emoji="card">
         <p className="mt-3 text-caption text-muted">
-          {state.cards.length > 1 ? 'Faturas' : 'Fatura'} de {monthLower(month)}
+          Fatura de {monthLower(month)}
+          {current && invoices.length > 1 && <> · {current.card.name}</>}
         </p>
         <div className="mt-1">
-          <Money cents={sum.cards} />
+          <Money cents={current?.amount ?? 0} />
         </div>
       </PanelHeader>
 
-      {state.cards.length === 0 ? (
+      {!current ? (
         <div className="mt-5 rounded-2xl bg-sunken px-4 py-6 text-center">
           <p className="text-muted">Cadastre um cartão pra acompanhar faturas e parcelas.</p>
           <Button variant="primary" size="sm" className="mt-3" onClick={() => openForm({ type: 'card' })}>
@@ -477,53 +422,98 @@ function CardsCard({ sum }: { sum: Summary }) {
         </div>
       ) : (
         <>
-          {/* todos os cartões inteiros, lado a lado: nada cortado na borda nem escondido atrás de rolagem */}
-          <div
-            className={cx(
-              'mt-4 grid shrink-0 gap-3',
-              invoices.length === 1 ? 'grid-cols-1' : invoices.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3',
+          <div className="mt-3 flex shrink-0 tight:mt-2 items-center justify-between gap-2">
+            <Button size="sm" onClick={() => openForm({ type: 'invoice', cardId: current.card.id, month })}>
+              Ver fatura
+            </Button>
+            {invoices.length > 1 && (
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Cartão anterior"
+                  disabled={index === 0}
+                  onClick={() => go(index - 1)}
+                  className="flex size-9 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-sunken disabled:cursor-not-allowed disabled:text-faint disabled:opacity-50"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Próximo cartão"
+                  disabled={index === invoices.length - 1}
+                  onClick={() => go(index + 1)}
+                  className="flex size-9 items-center justify-center rounded-full border border-line-strong text-fg hover:bg-sunken disabled:cursor-not-allowed disabled:text-faint disabled:opacity-50"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             )}
+          </div>
+
+          {/* a fileira sangra até a borda direita do painel: o próximo cartão aparece pela metade, como convite */}
+          <div
+            ref={strip}
+            className="no-scrollbar -mr-5 mt-3 flex shrink-0 tight:mt-2 gap-3 overflow-x-auto py-1 pr-5 sm:-mr-6 sm:pr-6"
           >
-            {invoices.map((inv) => (
+            {invoices.map((inv, i) => (
               <CardVisual
                 key={inv.card.id}
                 card={inv.card}
                 invoice={inv}
-                compact={invoices.length > 1}
-                onClick={() => openForm({ type: 'invoice', cardId: inv.card.id, month })}
+                className="!w-[min(320px,82%)] fit:!w-[min(272px,74%)] tight:!w-[min(216px,66%)]"
+                onClick={() => (i === index ? openForm({ type: 'invoice', cardId: inv.card.id, month }) : go(i))}
               />
             ))}
           </div>
 
           <h3 className="mt-5 text-micro font-semibold tracking-[0.06em] text-faint fit:mt-4 tight:hidden">PRÓXIMAS FATURAS</h3>
-          <ol className="mt-2 grid grid-cols-3 gap-2 tight:hidden">
-            {upcoming.map((u, i) => (
-              <li
-                key={u.month}
-                className={cx(
-                  'flex flex-col rounded-xl border p-2.5 text-center',
-                  i === 0 ? 'border-primary bg-primary-soft' : 'border-transparent bg-sunken',
-                )}
-              >
-                <span className="text-caption font-semibold">{monthShort(u.month)}</span>
-                <span className="mt-2 flex h-14 items-end justify-center fit:h-9" aria-hidden>
-                  <span
-                    className="w-7 rounded-t-[4px]"
-                    style={{
-                      height: `${Math.max(4, (u.total / max) * 100)}%`,
-                      background: i === 0 ? 'var(--primary)' : 'var(--line-strong)',
-                    }}
-                  />
-                </span>
-                <span className={cx('tnum mt-2 text-caption font-semibold', i === 0 ? 'text-accent' : 'text-muted')}>
-                  {brlRound(u.total)}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <div className="relative mt-2 tight:hidden">
+            <ol className="grid grid-cols-3 gap-2">
+              {upcoming.map((u, i) => (
+                <li
+                  key={u.month}
+                  className={cx(
+                    'flex h-[132px] flex-col items-center justify-between rounded-xl border p-2.5 text-center fit:h-[116px]',
+                    i === 0 ? 'border-primary bg-linear-to-b from-surface from-45% to-primary-soft' : 'border-transparent bg-sunken',
+                  )}
+                >
+                  <span>
+                    <span className="block text-caption font-semibold">{monthShort(u.month)}</span>
+                    {i === 0 && u.amount > 0 && <Badge tone={u.paid ? 'good' : 'primary'}>{u.paid ? 'Paga' : 'Aberta'}</Badge>}
+                  </span>
+                  <span className={cx('tnum text-caption font-semibold', i === 0 ? 'text-accent' : 'text-muted')}>
+                    {brl(u.amount)}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {/* linha ligando os três meses: sobe e desce com o valor da fatura */}
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-9 top-[58px]">
+              <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="size-full overflow-visible">
+                <polyline
+                  points={[...upcoming.map((u, i) => `${50 + i * 100},${y(u.amount)}`), `300,${y(upcoming[2].amount)}`].join(' ')}
+                  fill="none"
+                  stroke="var(--control)"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              {upcoming.map((u, i) => (
+                <span
+                  key={u.month}
+                  className={cx(
+                    'absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 bg-surface',
+                    i === 0 ? 'border-primary' : 'border-control',
+                  )}
+                  style={{ left: `${((i + 0.5) / 3) * 100}%`, top: `${y(u.amount)}%` }}
+                />
+              ))}
+            </div>
+          </div>
           <Link
             href="/cartoes"
-            className="mt-3 flex items-center justify-center fit:mt-2 gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft"
+            className="mt-3 flex items-center justify-center gap-1 rounded-xl py-2 text-caption font-semibold text-accent hover:bg-primary-soft fit:hidden"
           >
             Ver compras e parcelas <ChevronRight size={14} />
           </Link>
@@ -548,7 +538,7 @@ function HousingCard({ sum }: { sum: Summary }) {
   const ok = ratio <= HOUSING_REF
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <PanelHeader title="Moradia" emoji="house">
         <p className="mt-3 text-caption text-muted">Quanto você gasta pra morar</p>
         <div className="mt-1">
@@ -676,7 +666,7 @@ function ReserveStrip({ compact }: { compact?: boolean }) {
     )
 
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <PanelHeader title="Reserva">
           <div className="mt-2">

@@ -2,6 +2,7 @@ import { Minus, Pencil, Plus, Trash2 } from 'lucide-react'
 import { goalBalance, monthDiff } from '../../shared/finance.ts'
 import { Meter } from '../components.tsx'
 import { api } from '../lib/api.ts'
+import { achievements, streak } from '../lib/fun.ts'
 import { brl, currentMonth, dateBR, monthLong, pct } from '../lib/format.ts'
 import { useStore } from '../store.tsx'
 import { Amount, Button, ConfirmButton, Emoji, EmptyState, IconButton, Money, Panel, cx } from '../ui.tsx'
@@ -15,7 +16,7 @@ export function Reserve() {
     return (
       <Panel>
         <EmptyState
-          emoji="umbrella"
+          emoji="mascote-moeda"
           title="Sua reserva começa aqui"
           action={
             <Button
@@ -32,8 +33,8 @@ export function Reserve() {
     )
 
   return (
-    <div className="space-y-4">
-      <Panel className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
+    <div className="space-y-3 sm:space-y-4">
+      <Panel className="flex flex-wrap items-center justify-between gap-4 p-4 sm:p-6">
         <div>
           <p className="text-caption text-muted">Total guardado</p>
           <Money cents={total} className="mt-1" />
@@ -46,13 +47,13 @@ export function Reserve() {
         </div>
       </Panel>
 
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2 2xl:grid-cols-3">
         {state.goals.map((goal) => {
           const balance = goalBalance(state, goal)
           const left = goal.target_cents - balance
           const months = goal.deadline ? monthDiff(currentMonth(), goal.deadline) : 0
           return (
-            <Panel key={goal.id} className="flex flex-col p-5">
+            <Panel key={goal.id} className="flex flex-col p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Emoji name={goal.icon} size={48} />
                 <div className="min-w-0 flex-1">
@@ -98,7 +99,7 @@ export function Reserve() {
         })}
       </div>
 
-      <Panel className="p-5 sm:p-6">
+      <Panel className="p-4 sm:p-6">
         <h2 className="text-lead font-semibold">Histórico</h2>
         {state.goalMoves.length === 0 ? (
           <p className="py-8 text-center text-muted">Nada guardado ainda. Use “Guardar” em uma das metas.</p>
@@ -138,6 +139,45 @@ export function Reserve() {
           </ul>
         )}
       </Panel>
+
+      <AchievementsPanel />
     </div>
+  )
+}
+
+function AchievementsPanel() {
+  const { state } = useStore()
+  const list = achievements(state)
+  const run = streak(state)
+  const done = list.filter((a) => a.done).length
+  return (
+    <Panel className="p-4 sm:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lead font-semibold">Conquistas</h2>
+        <p className="text-caption text-muted">
+          {done} de {list.length}
+          {run > 0 && <> · {run === 1 ? '1 mês seguido' : `${run} meses seguidos`} no azul</>}
+        </p>
+      </div>
+      {/* no celular, duas por linha: ícone em cima, texto embaixo */}
+      <ul className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3 xl:grid-cols-4">
+        {list.map((a) => (
+          <li
+            key={a.id}
+            className={cx(
+              'flex flex-col items-start gap-1.5 rounded-2xl border p-3 sm:flex-row sm:items-center sm:gap-3',
+              a.done ? 'border-line bg-surface' : 'border-dashed border-line-strong',
+            )}
+          >
+            <Emoji name={a.emoji} size={36} className={a.done ? undefined : 'opacity-35 grayscale'} />
+            <span className="min-w-0">
+              <span className={cx('block font-semibold', !a.done && 'text-muted')}>{a.title}</span>
+              <span className="block text-xs text-muted sm:text-caption">{a.text}</span>
+              <span className="sr-only">{a.done ? ' (conquistada)' : ' (ainda não)'}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   )
 }

@@ -2,12 +2,13 @@
 
 import type { ReactNode } from 'react'
 import { ChevronRight, Wifi } from 'lucide-react'
-import { cardCommitted, dueDate, toISODate } from '../shared/finance.ts'
+import { cardCommitted, dueDate, payables, toISODate } from '../shared/finance.ts'
 import type { InvoiceView, Payable } from '../shared/finance.ts'
 import type { AppState, Card } from '../shared/types.ts'
 import { api } from './lib/api.ts'
 import { CARD_COLORS, category } from './lib/categories.ts'
-import { brl, brlRound, dayMonth } from './lib/format.ts'
+import { brl, brlRound, dayMonth, monthLower } from './lib/format.ts'
+import { playCoin } from './lib/fun.ts'
 import { useStore } from './store.tsx'
 import { Amount, Badge, CheckCircle, Emoji, cx } from './ui.tsx'
 
@@ -29,10 +30,18 @@ export const daysUntil = (iso: string, today = new Date()): number => {
 
 /** Marcar paga/abrir detalhes de uma conta ou fatura, com a tela reagindo na hora. */
 export const usePayableActions = () => {
-  const { run, openForm } = useStore()
+  const { run, openForm, state, celebrate, readonly, openPaywall } = useStore()
 
   const setPaid = (p: Payable, paid: boolean) => {
+    // só consulta: nem comemora nem mexe na tela, já explica o porquê
+    if (readonly) return openPaywall()
     const paidAt = paid ? toISODate(new Date()) : null
+    if (paid) {
+      // era a última conta em aberto do mês? então é festa; senão, só a moedinha
+      const others = payables(state, p.month).filter((o) => o.key !== p.key)
+      if (others.length > 0 && others.every((o) => o.paid)) celebrate(`Tudo pago em ${monthLower(p.month)}!`)
+      else playCoin()
+    }
     if (p.type === 'entry')
       return run(
         () => api('PUT', `/entries/${p.id}/months/${p.month}`, { paid }),
@@ -80,7 +89,7 @@ export function PayableRow({ p, detailed }: { p: Payable; detailed?: boolean }) 
       <button
         type="button"
         onClick={() => open(p)}
-        className="group flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg py-2 text-left"
+        className="group flex min-h-12 min-w-0 flex-1 tight:min-h-10 tight:py-1.5 items-center gap-3 rounded-lg py-2 text-left"
       >
         {/* em telas muito estreitas o nome da conta vale mais que o ícone */}
         {detailed && <Emoji name={cat.emoji} size={30} className={cx('max-[359px]:hidden', p.paid && 'opacity-50')} />}
@@ -205,7 +214,7 @@ export function Meter({
       aria-valuemax={100}
       className={cx('h-2 overflow-hidden rounded-full bg-sunken', className)}
     >
-      <div className="h-full rounded-full" style={{ width: `${ratio * 100}%`, background: color }} />
+      <div className="bar-x h-full rounded-full" style={{ width: `${ratio * 100}%`, background: color }} />
     </div>
   )
 }

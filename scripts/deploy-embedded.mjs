@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const clientDir = join(root, 'dist/client')
-const builtConfig = JSON.parse(readFileSync(join(root, 'dist/gestor_financeiro/wrangler.json'), 'utf8'))
+const builtConfig = JSON.parse(readFileSync(join(root, 'dist/poupin/wrangler.json'), 'utf8'))
 const outDir = join(root, 'dist/embedded')
 
 const TYPES = {
@@ -50,7 +50,7 @@ for (const full of walk(clientDir)) {
 }
 if (!files['/index.html']) throw new Error('dist/client/index.html não existe. Rode `npm run build` antes.')
 
-const worker = `import api from '../gestor_financeiro/index.js'
+const worker = `import api from '../poupin/index.js'
 
 // caminho -> [content-type, conteúdo em base64]
 const FILES = ${JSON.stringify(files)}
@@ -87,9 +87,14 @@ export default {
         : path === '/index.html'
           ? 'no-cache'
           : 'public, max-age=86400',
+      // mesmos cabeçalhos de public/_headers
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'same-origin',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests",
     }
     return new Response(request.method === 'HEAD' ? null : body(path), { headers })
   },

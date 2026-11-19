@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import type { AppState, Card, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { ApiError, api } from './lib/api.ts'
 import { currentMonth } from './lib/format.ts'
+import { setupSeen } from './Setup.tsx'
 import type { ToastData } from './ui.tsx'
 
 export type FormSpec =
@@ -29,8 +30,25 @@ type Store = {
     opts?: { patch?: (s: AppState) => AppState; success?: string },
   ) => Promise<boolean>
   form: FormSpec | null
+  /** Abre um formulário; com o acesso só de consulta, mostra o aviso de assinatura no lugar. */
   openForm: (f: FormSpec) => void
+  /** Teste encerrado sem assinatura: dá pra ver, não pra alterar. */
+  readonly: boolean
+  /** Mostra o aviso de assinatura. */
+  openPaywall: () => void
   closeForm: () => void
+  /** Configuração inicial (passo a passo do primeiro acesso). */
+  setupOpen: boolean
+  openSetup: () => void
+  closeSetup: () => void
+  /** Aviso de "teste encerrado, assine para continuar". */
+  paywall: boolean
+  closePaywall: () => void
+  reload: () => Promise<void>
+  /** Comemoração em tela cheia (confete + Poupin), com a frase a mostrar. */
+  celebration: string | null
+  celebrate: (text: string) => void
+  endCelebration: () => void
   theme: Theme
   setTheme: (t: Theme) => void
   toast: ToastData | null
@@ -59,6 +77,13 @@ export function StoreProvider({
   const [state, setState] = useState(initial)
   const [month, setMonth] = useState(currentMonth)
   const [form, setForm] = useState<FormSpec | null>(null)
+  // Abre sozinha só no primeiro acesso: nada cadastrado e ainda não vista neste aparelho.
+  const [setupOpen, setSetupOpen] = useState(
+    () => initial.entries.length === 0 && !setupSeen(initial.user.id) && initial.user.billing.access === 'full',
+  )
+  const [paywall, setPaywall] = useState(false)
+  const [celebration, setCelebration] = useState<string | null>(null)
+  const endCelebration = useCallback(() => setCelebration(null), [])
   const [toast, setToast] = useState<ToastData | null>(null)
   const [theme, setThemeState] = useState<Theme>(
     () => (document.documentElement.dataset.theme as Theme) ?? 'light',
@@ -93,6 +118,13 @@ export function StoreProvider({
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) {
           onSignedOut()
+          return false
+        }
+        // teste encerrado: em vez de um erro solto, explica e oferece a assinatura
+        if (e instanceof ApiError && e.code === 'subscription_required') {
+          setForm(null)
+          setPaywall(true)
+          if (patch) await reload().catch(() => {})
           return false
         }
         notify(e instanceof Error ? e.message : 'Algo deu errado.')
@@ -133,6 +165,15 @@ export function StoreProvider({
     onSignedOut()
   }, [onSignedOut])
 
+  const readonly = state.user.billing.access === 'readonly'
+  const openForm = useCallback(
+    (f: FormSpec) => {
+      if (readonly) return setPaywall(true)
+      setForm(f)
+    },
+    [readonly],
+  )
+
   const value = useMemo<Store>(
     () => ({
       state,
@@ -140,8 +181,19 @@ export function StoreProvider({
       setMonth,
       run,
       form,
-      openForm: setForm,
+      openForm,
+      readonly,
+      openPaywall: () => setPaywall(true),
       closeForm: () => setForm(null),
+      setupOpen,
+      openSetup: () => setSetupOpen(true),
+      closeSetup: () => setSetupOpen(false),
+      paywall,
+      closePaywall: () => setPaywall(false),
+      reload,
+      celebration,
+      celebrate: setCelebration,
+      endCelebration,
       theme,
       setTheme,
       toast,
@@ -149,7 +201,7 @@ export function StoreProvider({
       dismissToast,
       logout,
     }),
-    [state, month, run, form, theme, setTheme, toast, notify, dismissToast, logout],
+    [state, month, run, form, openForm, readonly, setupOpen, paywall, reload, celebration, endCelebration, theme, setTheme, toast, notify, dismissToast, logout],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

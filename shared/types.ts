@@ -76,11 +76,29 @@ export type GoalMove = {
   month: string | null
 }
 
+export type Billing = {
+  /** Situação do plano. */
+  /** 'active' = cartão com renovação automática; 'prepaid' = pago mês a mês. */
+  status: 'trial' | 'active' | 'prepaid' | 'cancelled' | 'expired' | 'lifetime'
+  /** 'readonly': o teste acabou e não há assinatura — dá pra ver e exportar, não pra alterar. */
+  access: 'full' | 'readonly'
+  /** A cobrança está configurada no servidor? */
+  enabled: boolean
+  price_cents: number
+  annual_price_cents: number
+  trial_days: number
+  trial_days_left: number
+  paid_until: string | null
+  /** Dias que faltam do período já pago (0 se não há). */
+  paid_days_left: number
+}
+
 export type User = {
   id: string
   email: string
   name: string
   daily_budget_cents: number
+  billing: Billing
 }
 
 export type AppState = {

@@ -24,8 +24,8 @@ export function Income() {
   const add = () => openForm({ type: 'entry', kind: 'income' })
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_392px]">
-      <Panel className="p-5 sm:p-6">
+    <div className="grid gap-3 sm:gap-4 xl:grid-cols-[minmax(0,1fr)_392px]">
+      <Panel className="p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lead font-semibold">Minha renda</h2>
@@ -72,7 +72,7 @@ export function Income() {
         )}
       </Panel>
 
-      <Panel className="self-start p-5 sm:p-6">
+      <Panel className="self-start p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lead font-semibold">Dia a dia</h2>

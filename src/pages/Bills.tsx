@@ -28,9 +28,9 @@ export function Bills() {
   const add = () => openForm({ type: 'entry', kind: 'expense' })
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Panel className="p-5">
+    <div className="space-y-3 sm:space-y-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <Panel className="col-span-2 p-4 sm:col-span-1 sm:p-5">
           <p className="text-caption text-muted">Falta pagar</p>
           <Money cents={total - paid} className="mt-1" />
           {overdue.length > 0 && (
@@ -39,20 +39,20 @@ export function Bills() {
             </p>
           )}
         </Panel>
-        <Panel className="p-5">
+        <Panel className="p-4 sm:p-5">
           <p className="text-caption text-muted">Já pago</p>
-          <Money cents={paid} className="mt-1" />
+          <Money cents={paid} size="stat" className="mt-1" />
           <p className="mt-1 text-caption text-muted">
             {list.filter((p) => p.paid).length} de {list.length} contas
           </p>
         </Panel>
-        <Panel className="p-5">
+        <Panel className="p-4 sm:p-5">
           <p className="text-caption text-muted">Total de {monthLower(month)}</p>
-          <Money cents={total} className="mt-1" />
+          <Money cents={total} size="stat" className="mt-1" />
         </Panel>
       </div>
 
-      <Panel className="p-5 sm:p-6">
+      <Panel className="p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lead font-semibold">Contas de {monthLower(month)}</h2>
           <div className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export function Bills() {
 
         {list.length === 0 ? (
           <EmptyState
-            emoji="receipt"
+            emoji="mascote-dormindo"
             title={`Nenhuma conta em ${monthLower(month)}`}
             action={
               <Button variant="primary" onClick={add}>

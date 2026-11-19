@@ -19,10 +19,10 @@
   --faint: #626a78;
   --ghost: #8a909d;
   --control: #8b90a0;
-  --primary: #1f5ce6;
-  --primary-hover: #194fcc;
-  --primary-soft: #e9f0fe;
-  --accent: #1f5ce6;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-soft: #f1eafe;
+  --accent: #6d28d9;
   --on-primary: #ffffff;
   --good: #0b7a34;
   --good-fill: #16a34a;
@@ -56,10 +56,10 @@
   --faint: #8b919d;
   --ghost: #6f7582;
   --control: #6a7080;
-  --primary: #2f6bf0;
-  --primary-hover: #4279f2;
-  --primary-soft: #1a2640;
-  --accent: #7aa2f9;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-soft: #271b45;
+  --accent: #b79cfb;
   --on-primary: #ffffff;
   --good: #3ecf71;
   --good-fill: #22b259;
@@ -82,13 +82,14 @@
 }
 
 /*
- * "fit": telas de computador com altura suficiente. Nelas a Visão geral ocupa
- * exatamente a janela, sem rolagem da página; se um cartão tiver mais conteúdo
- * do que cabe, ele rola por dentro.
+ * "fit": no computador, a Visão geral ocupa exatamente a janela, sem rolagem
+ * da página; se um cartão tiver mais conteúdo do que cabe, ele rola por dentro.
+ * "tight": o mesmo, em janelas baixas, onde somem os detalhes pra caber o essencial.
+ * Quem liga os dois é src/lib/scale.ts (atributos data-fit / data-tight no <html>),
+ * porque a interface é escalada com `zoom` e media queries não enxergam isso.
  */
-@custom-variant fit (@media (min-width: 80rem) and (min-height: 50rem));
-/* "tight": modo fit em janelas baixas (até ~990px): some o que é detalhe pra caber o essencial */
-@custom-variant tight (@media (min-width: 80rem) and (min-height: 50rem) and (max-height: 61.99rem));
+@custom-variant fit (&:where([data-fit] *));
+@custom-variant tight (&:where([data-tight] *));
 
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
@@ -127,44 +128,52 @@
   --shadow-pop: var(--shadow-pop);
 }
 
-html {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-feature-settings: 'cv11', 'ss01';
-  -webkit-font-smoothing: antialiased;
-  -webkit-tap-highlight-color: transparent;
-}
+/*
+ * Regras de elemento ficam na camada "base": assim qualquer classe utilitária
+ * (transition-colors, outline-none…) passa por cima delas, como esperado.
+ */
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-body {
-  min-height: 100dvh;
-  font-size: 14px;
-  line-height: 1.45;
-}
+  body {
+    min-height: var(--app-vh, 100dvh);
+    font-size: 14px;
+    line-height: 1.45;
+  }
 
-/* resposta ao toque: um leve afundar, sem depender de hover */
-button:not(:disabled):active,
-a[class*='rounded']:active {
-  transform: translateY(0.5px) scale(0.985);
-}
-button,
-a {
-  transition: transform 0.08s ease-out;
-}
+  /* resposta ao toque: um leve afundar, sem depender de hover */
+  button:not(:disabled):active,
+  a[class*='rounded']:active {
+    transform: translateY(0.5px) scale(0.985);
+  }
+  button,
+  a {
+    transition-property: transform, color, background-color, border-color, opacity, box-shadow;
+    transition-duration: 0.12s;
+    transition-timing-function: ease-out;
+  }
 
-button,
-[role='button'],
-select,
-summary {
-  cursor: pointer;
-}
-button:disabled {
-  cursor: default;
-}
+  button,
+  [role='button'],
+  select,
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 .tnum {
@@ -202,8 +211,7 @@ dialog.sheet::backdrop {
 .sheet-form {
   display: flex;
   flex-direction: column;
-  max-height: min(88vh, 760px);
-  max-height: min(88dvh, 760px);
+  max-height: min(calc(var(--app-vh, 100dvh) * 0.88), 760px);
 }
 .sheet-body {
   flex: 0 1 auto;
@@ -223,8 +231,7 @@ dialog.sheet::backdrop {
     animation: rise 0.2s ease-out;
   }
   .sheet-form {
-    max-height: 90vh;
-    max-height: 92dvh;
+    max-height: calc(var(--app-vh, 100dvh) * 0.92);
   }
 }
 @keyframes pop {
@@ -294,4 +301,253 @@ main:focus {
 .scroll-thin {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
+}
+
+/* ---------- movimento ----------
+ * Curto e com propósito: mostrar o que entrou na tela, o que mudou e o que
+ * respondeu ao toque. Tudo some com prefers-reduced-motion (regra acima).
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes check-pop {
+  40% {
+    transform: scale(1.25);
+  }
+}
+@keyframes float {
+  50% {
+    transform: translateY(-5px) rotate(-1.5deg);
+  }
+}
+@keyframes wiggle {
+  25% {
+    transform: rotate(-7deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(7deg) scale(1.05);
+  }
+}
+
+/* troca de tela: os painéis sobem em sequência */
+.page-in .rounded-panel {
+  animation: rise-in 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.page-in .rounded-panel:nth-child(2) {
+  animation-delay: 60ms;
+}
+.page-in .rounded-panel:nth-child(3) {
+  animation-delay: 120ms;
+}
+.page-in > * > :nth-child(2) .rounded-panel,
+.page-in > * > :nth-child(2) > :nth-child(2) .rounded-panel {
+  animation-delay: 90ms;
+}
+.page-in > * > :nth-child(n + 3) .rounded-panel {
+  animation-delay: 150ms;
+}
+
+/* barras: crescem ao aparecer e deslizam quando o valor muda */
+.bar-x {
+  transform-origin: left;
+  animation: grow-x 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: 0.15s;
+  transition: width 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.bar-y {
+  transform-origin: bottom;
+  animation: grow-y 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  transition: height 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.bar-seg {
+  transition: flex-grow 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.check-pop {
+  animation: check-pop 0.28s ease-out;
+}
+
+/* o Poupin respira; ao passar o mouse, se mexe */
+.mascot {
+  animation: float 4.5s ease-in-out infinite;
+}
+.mascot:hover {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+.pop-in {
+  transform-origin: top;
+  animation: pop 0.14s ease-out;
+}
+
+/* ---------- site público ----------
+ * Papel e tinta: fundo de papel, traço preto fino, cores chapadas, sombra dura.
+ * Sem degradê e sem sombra suave. Vale sempre, mesmo com o app no tema escuro.
+ */
+.site {
+  --ink: #17131f;
+  --paper: #faf7f0;
+  --bg: var(--paper);
+  --surface: #ffffff;
+  --sunken: #f1ece0;
+  --line: #17131f;
+  --line-strong: #17131f;
+  --fg: var(--ink);
+  --muted: #4d4759;
+  --faint: #6b6578;
+  --ghost: #9a94a6;
+  --control: #17131f;
+  --primary: #7c3aed;
+  --primary-hover: #6d28d9;
+  --primary-soft: #ebe1ff;
+  --accent: #6d28d9;
+  --good: #0f7a3d;
+  --good-fill: #1fae5b;
+  --good-soft: #d9f5e3;
+  --warn: #8a5a00;
+  --warn-soft: #ffe9a8;
+  --bad: #c7352b;
+  --bad-soft: #ffdcd8;
+  --sun: #ffd23f;
+  --shadow: none;
+  --shadow-pop: 6px 6px 0 var(--ink);
+  color-scheme: light;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* caixa com traço e sombra dura; o botão "afunda" ao passar o mouse */
+.box {
+  border: 1.5px solid var(--ink);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.btn-ink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border: 1.5px solid var(--ink);
+  border-radius: 12px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+.btn-ink:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.btn-ink:active {
+  transform: translate(4px, 4px) !important;
+  box-shadow: 0 0 0 var(--ink);
+}
+.btn-ink.alt {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* entra ao rolar: só sobe e aparece (o JS liga .in quando o bloco chega na tela) */
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.5s ease-out,
+    transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* carimbo de lançamento num dia do calendário */
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8) rotate(-8deg);
+  }
+}
+.stamp {
+  animation: stamp 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes nudge {
+  50% {
+    transform: translateY(6px);
+  }
+}
+.nudge {
+  animation: nudge 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  /* sem animação o confete ficaria parado no topo da tela: some de vez */
+  .confetti {
+    display: none;
+  }
+}
+
+/* ---------- comemoração ---------- */
+@keyframes confetti-fall {
+  from {
+    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(var(--drift, 0), 105vh, 0) rotate(720deg);
+    opacity: 0.9;
+  }
+}
+.confetti {
+  animation: confetti-fall linear both;
+}
+@keyframes celebrate-in {
+  from {
+    opacity: 0;
+    scale: 0.8;
+  }
+  60% {
+    scale: 1.04;
+  }
+}
+.celebrate-card {
+  animation: celebrate-in 0.35s ease-out both;
+}
+@keyframes celebrate-jump {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  30% {
+    transform: translateY(-18px) rotate(-6deg);
+  }
+  60% {
+    transform: translateY(0) rotate(4deg);
+  }
+  80% {
+    transform: translateY(-8px);
+  }
+}
+.celebrate-jump {
+  animation: celebrate-jump 0.9s ease-in-out 2;
 }
