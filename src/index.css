@@ -406,6 +406,21 @@ main:focus {
   opacity: 0.6;
 }
 
+/* brilho atrás da abertura */
+.intro-glow {
+  background:
+    radial-gradient(45% 55% at 72% 50%, rgb(124 58 237 / 0.16), transparent 70%),
+    radial-gradient(30% 40% at 95% 95%, rgb(236 72 153 / 0.08), transparent 70%);
+}
+@keyframes nudge {
+  50% {
+    transform: translateY(4px);
+  }
+}
+.nudge {
+  animation: nudge 1.4s ease-in-out infinite;
+}
+
 /* o Poupin anda de um card a outro, gingando enquanto anda */
 .walker {
   transition: transform 1.1s cubic-bezier(0.45, 0.05, 0.3, 1);

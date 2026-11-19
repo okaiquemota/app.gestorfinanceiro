@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
-import { ArrowRight, Check, Plus } from 'lucide-react'
+import { ArrowDown, ArrowRight, Check, Plus } from 'lucide-react'
 import { brl, brlRound, splitBRL } from '../lib/format.ts'
 import { SITE, orTBD, ownerLine } from '../lib/site.ts'
 import { Link } from '../router.tsx'
@@ -176,8 +176,8 @@ const MASCOT = 132
  * Onde o Poupin para em cada parte, e pra que lado abre o balão: sempre pro
  * lado de fora do card que ele está explicando, pra não cobrir o que importa.
  */
-const SPOTS: Record<Spot, { corner: 'tr' | 'tl' | 'beside' | 'above'; side: 'left' | 'right'; up?: boolean }> = {
-  hero: { corner: 'beside', side: 'right' },
+const SPOTS: Record<Spot, { corner: 'tr' | 'tl' | 'present' | 'above'; side: 'left' | 'right'; up?: boolean; big?: boolean }> = {
+  hero: { corner: 'present', side: 'right', up: true, big: true },
   left: { corner: 'tr', side: 'right' },
   salary: { corner: 'tr', side: 'right' },
   card: { corner: 'tr', side: 'right' },
@@ -190,7 +190,8 @@ function anchor(spot: Spot, r: DOMRect, stage: DOMRect): { x: number; y: number 
   const x = r.left - stage.left
   const y = r.top - stage.top
   const c = SPOTS[spot].corner
-  if (c === 'beside') return { x: x + r.width + 16, y: y + r.height - MASCOT + 10 }
+  // na abertura ele fica grande, na frente do canto de baixo do print, apresentando o app
+  if (c === 'present') return { x: x - MASCOT * 0.15, y: y + r.height - MASCOT * 0.9 }
   if (c === 'above') return { x: x + r.width - MASCOT * 0.9, y: y - MASCOT + 26 }
   if (c === 'tl') return { x: x - MASCOT * 0.8, y: y - MASCOT * 0.74 }
   return { x: x + r.width - MASCOT * 0.72, y: y - MASCOT * 0.56 }
@@ -210,6 +211,7 @@ function Walker({
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   const [walking, setWalking] = useState(false)
   const [facingLeft, setFacingLeft] = useState(false)
+  const [duration, setDuration] = useState(1.1)
   const last = useRef<{ x: number; y: number } | null>(null)
   const entered = useRef(false)
 
@@ -230,7 +232,10 @@ function Walker({
     }
     const prev = last.current
     if (prev && (Math.abs(prev.x - p.x) > 4 || Math.abs(prev.y - p.y) > 4)) {
-      setFacingLeft(p.x < prev.x)
+      // caminho longo (descer da abertura pro mês) leva mais tempo
+      const dist = Math.hypot(p.x - prev.x, p.y - prev.y)
+      setDuration(Math.min(1.9, Math.max(0.9, dist / 650)))
+      if (Math.abs(p.x - prev.x) > 20) setFacingLeft(p.x < prev.x)
       setWalking(true)
     }
     last.current = p
@@ -253,7 +258,7 @@ function Walker({
 
   // no celular ele fica no canto e a tela rola até a parte que ele está explicando
   useEffect(() => {
-    if (desktop) return
+    if (desktop || line.spot === 'hero') return
     targets[line.spot].current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [desktop, line.spot, targets])
 
@@ -272,8 +277,13 @@ function Walker({
   const body = (
     <div className={cx('relative', facingLeft && '-scale-x-100')}>
       <span aria-hidden className="absolute inset-x-5 bottom-1 h-3 rounded-full bg-black/15 blur-[6px]" />
-      <div className={cx(walking && 'waddle')}>
-        <Emoji key={line.pose} name={line.pose} size={MASCOT} alt="Poupin" className="pose-in relative drop-shadow-[0_10px_14px_rgb(0_0_0/0.18)]" />
+      <div
+        className="origin-bottom transition-transform duration-700"
+        style={{ transform: desktop && SPOTS[line.spot].big ? 'scale(1.55)' : undefined }}
+      >
+        <div className={cx(walking && 'waddle')}>
+          <Emoji key={line.pose} name={line.pose} size={MASCOT} alt="Poupin" className="pose-in relative drop-shadow-[0_10px_14px_rgb(0_0_0/0.18)]" />
+        </div>
       </div>
     </div>
   )
@@ -292,12 +302,16 @@ function Walker({
   return (
     <div
       className="walker pointer-events-none absolute left-0 top-0 z-40"
-      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, width: MASCOT, height: MASCOT }}
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, transitionDuration: `${duration}s`, width: MASCOT, height: MASCOT }}
       onTransitionEnd={() => setWalking(false)}
     >
       {body}
       <div
-        className={cx('pointer-events-auto absolute w-[300px]', cfg.up ? 'bottom-6' : 'top-2', bubbleOnLeft ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]')}
+        className={cx(
+          'pointer-events-auto absolute w-[300px]',
+          cfg.big ? 'bottom-[150px] left-[60%] w-[330px]' : cfg.up ? 'bottom-6' : 'top-2',
+          !cfg.big && (bubbleOnLeft ? 'right-[calc(100%-8px)]' : 'left-[calc(100%-8px)]'),
+        )}
       >
         {bubble}
       </div>
@@ -384,7 +398,9 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
   }
 
   // ---- o roteiro do passeio ----
+  const demo = useRef<HTMLElement>(null)
   const [step, setStep] = useState(0)
+  const [intro, setIntro] = useState(0)
   const [reaction, setReaction] = useState<Line | null>(null)
   const touring = step < 6
   const next = () => {
@@ -395,6 +411,34 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
     setReaction(null)
     setStep(6)
   }
+  /** Sai da abertura: a tela desce até o mês e ele vai junto. */
+  const goDown = () => {
+    setReaction(null)
+    setStep((s) => Math.max(s, 1))
+    demo.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const replay = () => {
+    setReaction(null)
+    setIntro(0)
+    setStep(0)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // a apresentação anda sozinha, uma fala a cada poucos segundos
+  useEffect(() => {
+    if (step !== 0 || intro >= 2) return
+    const t = window.setTimeout(() => setIntro((i) => i + 1), intro === 0 ? 3800 : 4600)
+    return () => window.clearTimeout(t)
+  }, [step, intro])
+
+  // se a pessoa rolar por conta própria até o mês, o passeio começa
+  useEffect(() => {
+    const el = demo.current
+    if (!el || step !== 0) return
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setStep(1), { threshold: 0.45 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [step])
 
   const nextBtn = (label = 'Continuar') => (
     <>
@@ -411,12 +455,28 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
 
   const leftText = left < 0 ? `falta ${brl(-left)}` : `sobram ${brl(left)}`
   const script: Line[] = [
-    {
-      spot: 'hero',
-      pose: 'mascote-oi',
-      text: `Oi! Eu sou o ${SITE.name}. Deixa eu te mostrar como fica um mês aqui dentro? Leva meio minuto.`,
-      actions: nextBtn('Bora'),
-    },
+    ([
+      {
+        spot: 'hero',
+        pose: 'mascote-oi',
+        text: `Oi! Eu sou o ${SITE.name}. Esse aqui é o app onde eu cuido do mês do seu dinheiro.`,
+      },
+      {
+        spot: 'hero',
+        pose: 'mascote-moeda',
+        text: 'Eu junto o que entra, as contas e o cartão, e te conto quanto vai sobrar. Logo no dia 1, não no dia 30.',
+      },
+      {
+        spot: 'hero',
+        pose: 'mascote-festa',
+        text: 'Quer ver funcionando? Desce comigo que eu te mostro.',
+        actions: (
+          <button type="button" onClick={goDown} className={cx(linkButton('primary'), 'h-9 px-3.5')}>
+            Bora <ArrowDown size={16} />
+          </button>
+        ),
+      },
+    ] satisfies Line[])[intro],
     {
       spot: 'salary',
       pose: 'mascote-moeda',
@@ -585,16 +645,52 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
 
   return (
     <PublicShell>
-      <div aria-hidden className="stage-dots pointer-events-none absolute inset-0" />
-      <Header authenticated={authenticated} />
-      <main ref={stage} className="relative mx-auto flex max-w-6xl flex-col px-4 pb-48 sm:px-5 lg:h-[calc(var(--app-vh)-4rem)] lg:pb-5">
-        {/* apresentação */}
-        <section ref={targets.hero} className="max-w-xl pt-2 lg:pt-1">
-          <h1 className="text-[clamp(2rem,4vw,3rem)] font-semibold leading-[1.05] tracking-[-0.035em]">
-            O mês do seu dinheiro, <span className="text-accent">numa tela só.</span>
-          </h1>
-          <p className="mt-2 text-lead text-muted">Este é um mês de exemplo. Pode mexer em tudo: o {SITE.name} refaz a conta na hora.</p>
+      <div ref={stage} className="relative overflow-x-clip">
+        {/* ---------- abertura: o Poupin apresenta o app ---------- */}
+        <section className="relative flex min-h-(--app-vh) flex-col overflow-hidden">
+          <div aria-hidden className="intro-glow pointer-events-none absolute inset-0" />
+          <Header authenticated={authenticated} />
+          <div className="relative mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-5 pb-20 pt-4 lg:grid-cols-[0.85fr_1.15fr] lg:pb-24">
+            <div>
+              <h1 className="text-balance text-[clamp(2.4rem,5vw,4rem)] font-semibold leading-[1.03] tracking-[-0.04em]">
+                O mês do seu dinheiro, <span className="text-accent">numa tela só.</span>
+              </h1>
+              <p className="mt-5 max-w-md text-lg text-muted">
+                Renda, contas e cartões juntos. Você sabe quanto vai sobrar no fim do mês logo no dia 1.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <button type="button" onClick={goDown} className={linkButton('primary', 'lg')}>
+                  Me mostra como funciona <ArrowDown size={18} />
+                </button>
+                <Link href={start} className={linkButton('secondary', 'lg')}>
+                  {authenticated ? 'Abrir o app' : 'Criar conta'}
+                </Link>
+              </div>
+              <p className="mt-4 text-caption text-muted">{offer}</p>
+            </div>
+            <div ref={targets.hero as RefObject<HTMLDivElement | null>} className="relative">
+              <div className="overflow-hidden rounded-panel border border-line bg-surface shadow-pop ring-8 ring-surface/60 lg:[transform:perspective(1600px)_rotateY(-9deg)_rotateX(3deg)]">
+                <img src="/tela.webp" alt={`Tela de visão geral do ${SITE.name}`} width={1440} height={900} className="w-full" />
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={goDown}
+            className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 text-caption font-medium text-muted hover:text-fg"
+          >
+            role pra ver
+            <ArrowDown size={18} className="nudge" />
+          </button>
         </section>
+
+        {/* ---------- o mês de exemplo, onde ele mostra cada parte ---------- */}
+        <main ref={demo} className="relative isolate mx-auto flex max-w-6xl scroll-mt-0 flex-col px-4 pb-48 pt-6 sm:px-5 lg:h-(--app-vh) lg:pb-5">
+          <div aria-hidden className="stage-dots pointer-events-none absolute inset-0 -z-10" />
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Um mês de exemplo</h2>
+            <p className="text-muted">Pode mexer em tudo: o {SITE.name} refaz a conta na hora.</p>
+          </div>
 
         <div className="mt-5 grid min-h-0 flex-1 gap-4 lg:grid-cols-12 lg:gap-5">
           <div className="flex min-h-0 flex-col gap-4 lg:col-span-7 lg:gap-5">
@@ -700,7 +796,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
                 Perguntar ao {SITE.name}
               </button>
               {!touring && (
-                <button type="button" onClick={() => setStep(0)} className="py-1 hover:text-fg">
+                <button type="button" onClick={replay} className="py-1 hover:text-fg">
                   Rever o passeio
                 </button>
               )}
@@ -708,8 +804,9 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
           </section>
         </div>
 
+        </main>
         <Walker stage={stage} targets={targets} line={line} desktop={desktop} />
-      </main>
+      </div>
     </PublicShell>
   )
 }
