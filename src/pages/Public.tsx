@@ -840,7 +840,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
         </section>
 
         {/* ---------- o mês de exemplo, onde ele mostra cada parte ---------- */}
-        <main ref={demo} className="relative isolate mx-auto flex max-w-6xl scroll-mt-0 flex-col px-4 pb-48 pt-6 sm:px-5 lg:min-h-(--app-vh) lg:pb-8">
+        <main ref={demo} className="relative isolate mx-auto flex max-w-6xl scroll-mt-0 flex-col px-4 pb-[min(60vh,26rem)] pt-6 sm:px-5 lg:min-h-(--app-vh) lg:pb-8">
           <div aria-hidden className="stage-dots pointer-events-none absolute inset-0 -z-10" />
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Um mês de exemplo</h2>
@@ -940,11 +940,15 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
 
         {/* chamada e rodapé */}
         <div className="mt-4 flex flex-col gap-3 lg:mt-5 lg:flex-row lg:items-center lg:justify-between">
-          <section ref={targets.cta} className={cx('flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl p-1 lg:flex-nowrap', focus('cta'))}>
-            <Link href={start} className={linkButton('primary', 'lg')}>
+          <section
+            ref={targets.cta}
+            className={cx('flex flex-col items-stretch gap-2 rounded-2xl p-1 lg:flex-row lg:items-center lg:gap-4', focus('cta'))}
+          >
+            {/* no celular o botão ocupa a largura toda */}
+            <Link href={start} className={cx(linkButton('primary', 'lg'), 'max-lg:h-13 max-lg:w-full')}>
               {authenticated ? 'Abrir o app' : 'Montar o meu mês de verdade'} <ArrowRight size={18} />
             </Link>
-            <span className="text-caption text-muted">{offer}</span>
+            <span className="text-caption text-muted max-lg:text-center">{offer}</span>
           </section>
           <section ref={targets.faq} className="rounded-panel">
             <FooterLinks compact>
