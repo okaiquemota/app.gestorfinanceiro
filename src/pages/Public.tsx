@@ -218,10 +218,15 @@ function Walker({
   const last = useRef<{ x: number; y: number } | null>(null)
   const entered = useRef(false)
 
-  const place = useCallback(() => {
+  const place: () => void = useCallback(() => {
     const s = stage.current?.getBoundingClientRect()
     const t = targets[line.spot].current?.getBoundingClientRect()
-    if (!s || !t) return
+    // na primeira pintura o palco ainda pode não estar ligado (o ref do pai
+    // chega depois do efeito do filho): tenta de novo no próximo quadro
+    if (!s || !t) {
+      requestAnimationFrame(() => place())
+      return
+    }
     const p = anchor(line.spot, t, s)
     p.x = Math.max(0, Math.min(s.width - MASCOT, p.x))
     p.y = Math.max(0, p.y)
@@ -256,7 +261,12 @@ function Walker({
       place()
     }
     window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    // fontes e imagens que terminam de carregar mudam o tamanho dos cards
+    window.addEventListener('load', place)
+    return () => {
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('load', place)
+    }
   }, [desktop, place])
 
   // no celular ele fica no canto e a tela rola até a parte que ele está explicando
