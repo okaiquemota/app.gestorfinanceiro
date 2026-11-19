@@ -270,6 +270,32 @@ app.post('/billing/webhook', async (c) => {
   return c.json({ ok: true })
 })
 
+app.post('/auth/login', async (c) => {
+  const b = await readBody(c)
+  const guard = await throttle(c)
+  const email = typeof b.email === 'string' ? b.email.trim().toLowerCase() : ''
+  const pass = typeof b.password === 'string' ? b.password : ''
+  const user = await c.env.DB.prepare('SELECT id, password_hash, password_salt FROM users WHERE email = ?')
+    .bind(email)
+    .first<{ id: string; password_hash: string; password_salt: string }>()
+  // calcula o hash mesmo sem usuário, pra resposta levar o mesmo tempo
+  const hash = await hashPassword(pass, user?.password_salt ?? '00000000000000000000000000000000')
+  if (!user || !safeEqual(hash, user.password_hash)) {
+    await guard.fail()
+    throw new HttpError(401, 'E-mail ou senha incorretos.')
+  }
+  await startSession(c, user.id)
+  return c.json({ ok: true })
+})
+
+app.post('/auth/logout', async (c) => {
+  const token = getCookie(c, SESSION_COOKIE)
+  if (token)
+    await c.env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run()
+  deleteCookie(c, SESSION_COOKIE, { path: '/' })
+  return c.json({ ok: true })
+})
+
 // Tudo daqui pra baixo exige sessão.
 app.use('*', async (c, next) => {
   const userId = await sessionUser(c)
