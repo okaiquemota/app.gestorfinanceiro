@@ -55,7 +55,7 @@ export function CashFlow() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="fit-page space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <Panel className="p-5">
           <p className="text-caption text-muted">Sobra somada em {MONTHS} meses</p>
@@ -163,7 +163,7 @@ export function CashFlow() {
         </div>
       </Panel>
 
-      <Panel className="overflow-hidden">
+      <Panel className="fit-grow fit-scroll overflow-hidden">
         <h2 className="px-5 pt-5 text-lead font-semibold sm:px-6">Mês a mês</h2>
         <p className="px-5 text-caption text-muted sm:px-6">Toque no mês pra abrir ele na visão geral.</p>
         <div className="mt-3 overflow-x-auto">

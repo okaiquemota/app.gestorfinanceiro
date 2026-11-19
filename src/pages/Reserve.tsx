@@ -33,7 +33,7 @@ export function Reserve() {
     )
 
   return (
-    <div className="space-y-4">
+    <div className="fit-page space-y-4">
       <Panel className="flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
         <div>
           <p className="text-caption text-muted">Total guardado</p>
@@ -47,7 +47,9 @@ export function Reserve() {
         </div>
       </Panel>
 
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+      {/* no computador: metas, histórico e conquistas lado a lado, cada um rolando por dentro */}
+      <div className="fit-grow fit-grid space-y-4 fit:grid fit:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(0,1fr)] fit:gap-4 fit:space-y-0">
+      <div className="fit-scroll grid gap-4 md:grid-cols-2 2xl:grid-cols-3 fit:content-start fit:p-0.5 fit:md:grid-cols-1 fit:2xl:grid-cols-2">
         {state.goals.map((goal) => {
           const balance = goalBalance(state, goal)
           const left = goal.target_cents - balance
@@ -99,7 +101,7 @@ export function Reserve() {
         })}
       </div>
 
-      <Panel className="p-5 sm:p-6">
+      <Panel className="fit-scroll p-5 sm:p-6">
         <h2 className="text-lead font-semibold">Histórico</h2>
         {state.goalMoves.length === 0 ? (
           <p className="py-8 text-center text-muted">Nada guardado ainda. Use “Guardar” em uma das metas.</p>
@@ -141,6 +143,7 @@ export function Reserve() {
       </Panel>
 
       <AchievementsPanel />
+      </div>
     </div>
   )
 }
@@ -151,7 +154,7 @@ function AchievementsPanel() {
   const run = streak(state)
   const done = list.filter((a) => a.done).length
   return (
-    <Panel className="p-5 sm:p-6">
+    <Panel className="fit-scroll p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lead font-semibold">Conquistas</h2>
         <p className="text-caption text-muted">
@@ -159,7 +162,7 @@ function AchievementsPanel() {
           {run > 0 && <> · {run === 1 ? '1 mês seguido' : `${run} meses seguidos`} no azul</>}
         </p>
       </div>
-      <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 fit:grid-cols-1 fit:sm:grid-cols-1 fit:xl:grid-cols-1">
         {list.map((a) => (
           <li
             key={a.id}

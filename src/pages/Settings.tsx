@@ -29,7 +29,7 @@ export function Settings() {
   }
 
   return (
-    <div className="grid max-w-4xl gap-4 md:grid-cols-2">
+    <div className="fit-grid grid max-w-4xl gap-4 md:grid-cols-2 fit:h-full fit:max-w-6xl fit:grid-cols-3">
       {/* no celular o menu de baixo não tem "Minha renda": o atalho fica aqui, em destaque */}
       <Link
         href="/renda"
@@ -42,7 +42,7 @@ export function Settings() {
         </span>
         <ChevronRight size={18} className="text-faint" />
       </Link>
-      <Panel className="space-y-4 p-5 sm:p-6">
+      <Panel className="fit-scroll space-y-4 self-start p-5 sm:p-6 fit:max-h-full">
         <h2 className="text-lead font-semibold">Perfil</h2>
         <form
           className="space-y-4"
@@ -87,7 +87,7 @@ export function Settings() {
         </div>
       </Panel>
 
-      <div className="space-y-4">
+      <div className="fit-scroll space-y-4 fit:p-0.5">
         <Panel className="p-5 sm:p-6">
           <h2 className="text-lead font-semibold">Trocar senha</h2>
           <form
@@ -120,6 +120,10 @@ export function Settings() {
             Abrir configuração inicial
           </Button>
         </Panel>
+      </div>
+
+      {/* no computador vira uma terceira coluna, pra tela caber sem rolar */}
+      <div className="fit-scroll space-y-4 fit:p-0.5">
 
         <Panel className="p-5 sm:p-6">
           <h2 className="text-lead font-semibold">Seus dados</h2>

@@ -40,7 +40,7 @@ export function Cards() {
   const max = Math.max(1, ...next.map((n) => n.amount))
 
   return (
-    <div className="space-y-4">
+    <div className="fit-page space-y-4">
       <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 py-1 lg:mx-0 lg:px-1">
         {invoices.map((i) => (
           <CardVisual key={i.card.id} card={i.card} invoice={i} selected={i.card.id === card.id} onClick={() => setPickedId(i.card.id)} />
@@ -55,8 +55,8 @@ export function Cards() {
         </button>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_392px]">
-        <Panel className="p-5 sm:p-6">
+      <div className="fit-grow fit-grid grid gap-4 xl:grid-cols-[minmax(0,1fr)_392px]">
+        <Panel className="fit-scroll p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 text-lead font-semibold">
@@ -116,7 +116,7 @@ export function Cards() {
           )}
         </Panel>
 
-        <div className="space-y-4">
+        <div className="fit-page space-y-4">
           {card.limit_cents > 0 && (
             <Panel className="p-5 sm:p-6">
               <h2 className="text-lead font-semibold">Limite</h2>
@@ -138,7 +138,7 @@ export function Cards() {
             </Panel>
           )}
 
-          <Panel className="p-5 sm:p-6">
+          <Panel className="fit-grow fit-scroll p-5 sm:p-6">
             <h2 className="text-lead font-semibold">Próximas faturas</h2>
             <p className="mt-1 text-caption text-muted">Parcelas e assinaturas já lançadas.</p>
             <ol className="mt-3 space-y-0.5">

@@ -28,7 +28,7 @@ export function Bills() {
   const add = () => openForm({ type: 'entry', kind: 'expense' })
 
   return (
-    <div className="space-y-4">
+    <div className="fit-page space-y-4">
       <div className="grid gap-4 sm:grid-cols-3">
         <Panel className="p-5">
           <p className="text-caption text-muted">Falta pagar</p>
@@ -52,7 +52,7 @@ export function Bills() {
         </Panel>
       </div>
 
-      <Panel className="p-5 sm:p-6">
+      <Panel className="fit-grow fit-scroll p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lead font-semibold">Contas de {monthLower(month)}</h2>
           <div className="flex items-center gap-2">

@@ -466,11 +466,11 @@ export function Layout({ children }: { children: ReactNode }) {
         Pular para o conteúdo
       </a>
       <Sidebar path={path} />
-      <div className="min-w-0 flex-1 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-4">
+      <div className="min-w-0 flex-1 pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-4 fit:flex fit:h-[calc(var(--app-vh)-2rem)] fit:flex-col fit:pb-0">
         <TopBar page={page} />
-        <main id="conteudo" ref={main} tabIndex={-1} className="pt-4 outline-none lg:pt-5">
+        <main id="conteudo" ref={main} tabIndex={-1} className="pt-4 outline-none lg:pt-5 fit:min-h-0 fit:flex-1">
           {/* a chave refaz o bloco a cada tela, o que dispara a entrada dos painéis */}
-          <div key={path} className="page-in">
+          <div key={path} className="page-in fit:h-full">
             {children}
           </div>
         </main>
