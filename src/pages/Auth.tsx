@@ -168,11 +168,11 @@ export function Auth({ mode, trialDays, onDone }: { mode: AuthMode; trialDays: n
                 />
                 <span>
                   Li e aceito os{' '}
-                  <a href="/termos" target="_blank" rel="noreferrer" className="font-semibold text-accent">
+                  <a href="/termos" target="_blank" rel="noreferrer" className="whitespace-nowrap font-semibold text-accent">
                     termos de uso
                   </a>{' '}
                   e a{' '}
-                  <a href="/privacidade" target="_blank" rel="noreferrer" className="font-semibold text-accent">
+                  <a href="/privacidade" target="_blank" rel="noreferrer" className="whitespace-nowrap font-semibold text-accent">
                     política de privacidade
                   </a>
                   .

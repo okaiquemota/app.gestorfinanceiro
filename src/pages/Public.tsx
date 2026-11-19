@@ -3,10 +3,11 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode, RefObject } from 'react'
-import { ArrowDown, ArrowRight, Check, Moon, Plus, Sun } from 'lucide-react'
+import { ArrowDown, ArrowRight, Check, Plus } from 'lucide-react'
 import { brl, brlRound, splitBRL } from '../lib/format.ts'
 import { SITE, orTBD, ownerLine } from '../lib/site.ts'
 import { Link } from '../router.tsx'
+import { paintTheme, preferredTheme } from '../lib/theme.ts'
 import { Emoji, Panel, cx } from '../ui.tsx'
 
 export type PublicPlan = { price_cents: number; annual_price_cents: number; trial_days: number; billing_enabled: boolean; email_enabled: boolean }
@@ -21,55 +22,20 @@ export const linkButton = (variant: 'primary' | 'secondary' | 'ghost' = 'primary
     variant === 'ghost' && 'text-muted hover:bg-sunken hover:text-fg',
   )
 
-/** Moldura das telas públicas: o mesmo fundo e o mesmo tema do app. */
-export function PublicShell({ children }: { children: ReactNode }) {
-  return <div className="relative min-h-(--app-vh) bg-bg text-fg">{children}</div>
-}
-
 /**
- * Claro/escuro no site, igual ao do app: vale a escolha guardada (gf-theme)
- * ou, sem escolha, o tema do sistema (ver public/theme.js).
+ * Moldura das telas públicas: o mesmo fundo e as mesmas peças do app, sempre
+ * no tema claro. Ao sair (ex.: depois de entrar), volta o tema que a pessoa
+ * escolheu pro app. Títulos e textos quebram linha sem deixar palavra sozinha.
  */
-function ThemeToggle() {
-  const [dark, setDark] = useState(() => document.documentElement.dataset.theme === 'dark')
-  const set = (d: boolean) => {
-    const t = d ? 'dark' : 'light'
-    document.documentElement.dataset.theme = t
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', d ? '#0b0c0f' : '#f2f3f6')
-    try {
-      localStorage.setItem('gf-theme', t)
-    } catch {
-      // sem localStorage (aba privada): vale só nesta visita
-    }
-    setDark(d)
-  }
+export function PublicShell({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => {
+    paintTheme('light')
+    return () => paintTheme(preferredTheme())
+  }, [])
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={dark}
-      aria-label="Tema escuro"
-      title={dark ? 'Mudar pro tema claro' : 'Mudar pro tema escuro'}
-      onClick={() => set(!dark)}
-      className="group flex shrink-0 rounded-full bg-sunken p-0.5 hover:bg-line"
-    >
-      {/* no celular, um botão só: mostra o tema pra onde vai */}
-      <span aria-hidden className="flex size-9 items-center justify-center rounded-full text-muted sm:hidden">
-        {dark ? <Sun size={17} /> : <Moon size={17} />}
-      </span>
-      {([Sun, Moon] as const).map((Icon, i) => (
-        <span
-          key={i}
-          aria-hidden
-          className={cx(
-            'hidden size-8 items-center justify-center rounded-full transition-colors sm:flex',
-            (i === 1) === dark ? 'bg-surface text-fg shadow-card' : 'text-faint group-hover:text-muted',
-          )}
-        >
-          <Icon size={15} />
-        </span>
-      ))}
-    </button>
+    <div className="relative min-h-(--app-vh) bg-bg text-fg [&_h1]:text-balance [&_h2]:text-balance [&_h3]:text-balance [&_p]:text-pretty [&_li]:text-pretty">
+      {children}
+    </div>
   )
 }
 
@@ -82,7 +48,6 @@ function Header({ authenticated, narrow }: { authenticated?: boolean; narrow?: b
           <span className="text-lg font-semibold tracking-[-0.02em]">{SITE.name}</span>
         </Link>
         <nav aria-label="Conta" className="flex items-center gap-1.5 sm:gap-2">
-          <ThemeToggle />
           {authenticated ? (
             <Link href="/" className={linkButton('primary')}>
               Abrir o app
@@ -547,7 +512,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
       {
         spot: 'hero',
         pose: 'mascote-moeda',
-        text: 'Eu junto o que entra, as contas e o cartão, e te conto quanto vai sobrar. Logo no dia 1, não no dia 30.',
+        text: 'Eu junto o que entra, as contas e o cartão, e te conto quanto vai sobrar. Logo no dia\u00a01, não no dia\u00a030.',
       },
       {
         spot: 'hero',
@@ -583,7 +548,7 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
       pose: mood.pose,
       text: (
         <>
-          E esse é o número que importa: com esse mês, <strong>{leftText}</strong>. Você vê isso no dia 1, não no dia 30.
+          E esse é o número que importa: com esse mês, <strong>{leftText}</strong>. Você vê isso no dia&nbsp;1, não no dia&nbsp;30.
         </>
       ),
       actions: nextBtn(),
@@ -811,8 +776,10 @@ export function Landing({ plan, authenticated }: { plan: PublicPlan; authenticat
               <h1 className="text-balance text-[clamp(2rem,3.6vw,3rem)] font-semibold leading-[1.05] tracking-[-0.035em]">
                 O mês do seu dinheiro, <span className="text-accent">numa tela só.</span>
               </h1>
-              <p className="mx-auto mt-3 max-w-lg text-lg text-muted">
-                Renda, contas e cartões juntos. Você sabe quanto vai sobrar no fim do mês logo no dia 1.
+              <p className="mx-auto mt-3 max-w-xl text-lg text-muted">
+                Renda, contas e cartões juntos.
+                <br />
+                Você sabe quanto vai sobrar no fim do mês logo no dia&nbsp;1.
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <button type="button" onClick={goDown} className={linkButton('primary', 'lg')}>

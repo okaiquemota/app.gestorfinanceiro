@@ -455,6 +455,8 @@ main:focus {
   background: var(--speech-bg);
   color: var(--fg);
   line-height: 1.4;
+  /* sem palavra sozinha na última linha da fala */
+  text-wrap: pretty;
   box-shadow: 0 14px 34px rgb(76 29 149 / 0.16);
 }
 :root[data-theme='dark'] .speech {

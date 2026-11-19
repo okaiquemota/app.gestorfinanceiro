@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import type { AppState, Card, Challenge, Entry, EntryKind, Goal, Purchase } from '../shared/types.ts'
 import { ApiError, api } from './lib/api.ts'
+import { preferredTheme } from './lib/theme.ts'
 import { currentMonth } from './lib/format.ts'
 import { setupSeen } from './Setup.tsx'
 import type { ToastData } from './ui.tsx'
@@ -94,9 +95,8 @@ export function StoreProvider({
   const [celebration, setCelebration] = useState<Celebration | null>(null)
   const endCelebration = useCallback(() => setCelebration(null), [])
   const [toast, setToast] = useState<ToastData | null>(null)
-  const [theme, setThemeState] = useState<Theme>(
-    () => (document.documentElement.dataset.theme as Theme) ?? 'light',
-  )
+  // a escolha da pessoa, e não o que está pintado agora (o site público força o claro)
+  const [theme, setThemeState] = useState<Theme>(preferredTheme)
   const timer = useRef<number | undefined>(undefined)
 
   const notify = useCallback<Store['notify']>((message, tone = 'error') => {

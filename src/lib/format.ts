@@ -14,20 +14,20 @@ export const splitBRL = (cents: number): { neg: boolean; int: string; dec: strin
 
 export const brl = (cents: number): string => {
   const { neg, int, dec } = splitBRL(cents)
-  return `${neg ? '−' : ''}R$ ${int},${dec}`
+  return `${neg ? '−' : ''}R$\u00a0${int},${dec}`
 }
 
 /** Arredondado ao real, pra espaços apertados onde o centavo não muda a leitura. */
 export const brlRound = (cents: number): string =>
-  `${cents < 0 ? '−' : ''}R$ ${nf.format(Math.round(Math.abs(cents) / 100))}`
+  `${cents < 0 ? '−' : ''}R$\u00a0${nf.format(Math.round(Math.abs(cents) / 100))}`
 
 /** Sem centavos, pra espaços apertados (eixos, chips). */
 export const brlShort = (cents: number): string => {
   const abs = Math.abs(cents) / 100
   const sign = cents < 0 ? '−' : ''
-  if (abs >= 1_000_000) return `${sign}R$ ${(abs / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`
-  if (abs >= 1_000) return `${sign}R$ ${(abs / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`
-  return `${sign}R$ ${nf.format(Math.round(abs))}`
+  if (abs >= 1_000_000) return `${sign}R$\u00a0${(abs / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}\u00a0mi`
+  if (abs >= 1_000) return `${sign}R$\u00a0${(abs / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}\u00a0mil`
+  return `${sign}R$\u00a0${nf.format(Math.round(abs))}`
 }
 
 export const pct = (part: number, total: number): string =>
