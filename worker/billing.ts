@@ -114,12 +114,12 @@ export const createCheckout = async (
 ): Promise<string> => {
   const recurring = period === 'month' && method === 'card'
   const meta = { user_id: user.id, period }
-  const session = await stripe(env, 'POST', '/checkout/sessions', {
+  const open = (customer: string | null) => stripe(env, 'POST', '/checkout/sessions', {
     mode: recurring ? 'subscription' : 'payment',
     client_reference_id: user.id,
     metadata: meta,
     // reaproveita o cliente da Stripe quando já existe; senão, só preenche o e-mail
-    ...(user.stripe_customer_id ? { customer: user.stripe_customer_id } : { customer_email: user.email }),
+    ...(customer ? { customer } : { customer_email: user.email }),
     locale: 'pt-BR',
     success_url: `${origin}/assinatura?pagamento=retorno&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/assinatura`,
@@ -140,6 +140,16 @@ export const createCheckout = async (
     // anual no cartão: a Stripe oferece o parcelamento disponível para o cartão da pessoa
     ...(period === 'year' && method === 'card' ? { payment_method_options: { card: { installments: { enabled: true } } } } : {}),
   })
+  let session: Json
+  try {
+    session = await open(user.stripe_customer_id)
+  } catch (e) {
+    // cliente criado em outro modo (teste x produção) ou apagado na Stripe:
+    // esquece o id guardado e abre o pagamento só com o e-mail
+    if (!user.stripe_customer_id || !(e instanceof Error) || !/No such customer/i.test(e.message)) throw e
+    await env.DB.prepare('UPDATE users SET stripe_customer_id = NULL WHERE id = ?').bind(user.id).run()
+    session = await open(null)
+  }
   if (typeof session.url !== 'string') throw new Error('Stripe não devolveu o link de pagamento')
   return session.url
 }
@@ -239,7 +249,12 @@ export const cancelAtPeriodEnd = async (env: BillingEnv, subscriptionId: string)
 
 /** Encerra na hora (usado ao excluir a conta). */
 export const cancelNow = async (env: BillingEnv, subscriptionId: string): Promise<void> => {
-  await stripe(env, 'DELETE', `/subscriptions/${encodeURIComponent(subscriptionId)}`)
+  try {
+    await stripe(env, 'DELETE', `/subscriptions/${encodeURIComponent(subscriptionId)}`)
+  } catch (e) {
+    // já não existe na Stripe (encerrada, ou criada no modo de teste): nada a cancelar
+    if (!(e instanceof Error) || !/No such subscription/i.test(e.message)) throw e
+  }
 }
 
 // ---------- webhook ----------
